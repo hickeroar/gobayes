@@ -6,25 +6,25 @@ type Categories struct {
 }
 
 // NewCategories returns a pointer to a instance of type Categories
-func NewCategories() *Categories {
-	return &Categories{
+func NewCategories() Categories {
+	return Categories{
 		categories: make(map[string]*Category),
 	}
 }
 
 // AddCategory is responsible for adding a new trainable category
-func (cats *Categories) AddCategory(name string) Category {
+func (cats *Categories) AddCategory(name string) *Category {
 	cat := NewCategory(name)
 
-	cats.categories[name] = cat
+	cats.categories[name] = &cat
 
-	return *cat
+	return cats.GetCategory(name)
 }
 
 // GetCategory returns a specified category
-func (cats *Categories) GetCategory(name string) Category {
+func (cats *Categories) GetCategory(name string) *Category {
 	if val, ok := cats.categories[name]; ok {
-		return *val
+		return val
 	}
 
 	// If we get here, we don't have this category, so we're adding it.
