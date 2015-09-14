@@ -1,9 +1,12 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/hickeroar/gobayes/bayes"
+)
 
 func main() {
-	class := NewClassifier()
+	class := bayes.NewClassifier()
 
 	class.Categories.AddCategory("bleh")
 	class.Categories.AddCategory("gleh")
@@ -14,5 +17,4 @@ func main() {
 		fmt.Println(name)
 		fmt.Println("Tally:", cat.GetTally())
 	}
-
 }

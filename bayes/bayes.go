@@ -1,7 +1,7 @@
 package bayes
 
 import (
-	"github.com/hickeroar/gobayes/category"
+	"github.com/hickeroar/gobayes/bayes/category"
 	"strings"
 )
 
