@@ -10,8 +10,8 @@ type Category struct {
 }
 
 // NewCategory returns a pointer to a instance of type Category
-func NewCategory(name string) Category {
-	return Category{
+func NewCategory(name string) *Category {
+	return &Category{
 		Name:         name,
 		Tokens:       make(map[string]int),
 		Tally:        0,

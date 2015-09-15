@@ -18,9 +18,9 @@ type Classifier struct {
 }
 
 // NewClassifier returns a pointer to a instance of type Classifier
-func NewClassifier() Classifier {
-	return Classifier{
-		Categories: category.NewCategories(),
+func NewClassifier() *Classifier {
+	return &Classifier{
+		Categories: *category.NewCategories(),
 	}
 }
 
@@ -83,7 +83,7 @@ func (c *Classifier) calculateCategoryProbabilities() {
 
 // Flush empties the categories to remove all values
 func (c *Classifier) Flush() {
-	c.Categories = category.NewCategories()
+	c.Categories = *category.NewCategories()
 }
 
 // Train takes a text sample and trains a category with it

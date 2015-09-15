@@ -1,28 +1,47 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
+	"flag"
+	"github.com/gorilla/mux"
 	"github.com/hickeroar/gobayes/bayes"
+	"io/ioutil"
+	"net/http"
 )
 
-func main() {
-	class := bayes.NewClassifier()
+// ClassifierAPI handles requests and holds our classifier
+type ClassifierAPI struct {
+	classifier bayes.Classifier
+}
 
-	class.Categories.AddCategory("foo")
-	class.Categories.AddCategory("baz")
-	class.Categories.AddCategory("baz")
-	class.Train("foo", "the boy's bomb is stupid, round, and most likely a dud")
-	class.Train("bar", "the quick brown fox is the bomb")
-	class.Train("baz", "your mother is not the bomb")
+// RegisterRoutes sets up the routing for the API
+func (c *ClassifierAPI) RegisterRoutes(r *mux.Router) {
+	r.HandleFunc("/train/{category:[A-Za-z]+}", c.TrainHandler).Methods("POST")
+}
 
-	categories := class.Categories.GetCategories()
-
-	for name, cat := range categories {
-		fmt.Println(name)
-		fmt.Println("Tally:", cat.GetTally())
-		fmt.Println(cat.ProbInCat)
-		fmt.Println(cat.ProbNotInCat)
+// TrainHandler handles requests to train the classifier
+func (c *ClassifierAPI) TrainHandler(w http.ResponseWriter, req *http.Request) {
+	category := mux.Vars(req)["category"]
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		panic("Unable to Read Request Body")
 	}
+	c.classifier.Train(category, string(body))
+	jsonResponse, err := json.Marshal(NewStandardClassifierResponse(c, true))
 
-	fmt.Println(class.Classify("In counterstrike the point of the game is to plant the bomb or defend the bombsite."))
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonResponse)
+}
+
+func main() {
+	r := mux.NewRouter()
+
+	controller := new(ClassifierAPI)
+	controller.classifier = *bayes.NewClassifier()
+	controller.RegisterRoutes(r)
+
+	port := flag.String("port", "8000", "The port the server should listen on.")
+	flag.Parse()
+
+	http.ListenAndServe(":"+*port, r)
 }

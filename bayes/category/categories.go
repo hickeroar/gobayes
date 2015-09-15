@@ -6,8 +6,8 @@ type Categories struct {
 }
 
 // NewCategories returns a pointer to a instance of type Categories
-func NewCategories() Categories {
-	return Categories{
+func NewCategories() *Categories {
+	return &Categories{
 		categories: make(map[string]*Category),
 	}
 }
@@ -16,7 +16,7 @@ func NewCategories() Categories {
 func (cats *Categories) AddCategory(name string) *Category {
 	cat := NewCategory(name)
 
-	cats.categories[name] = &cat
+	cats.categories[name] = cat
 
 	return cats.GetCategory(name)
 }
