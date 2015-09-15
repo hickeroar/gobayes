@@ -23,4 +23,6 @@ func main() {
 		fmt.Println(cat.ProbInCat)
 		fmt.Println(cat.ProbNotInCat)
 	}
+
+	fmt.Println(class.Classify("In counterstrike the point of the game is to plant the bomb or defend the bombsite."))
 }
