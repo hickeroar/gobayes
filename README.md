@@ -132,7 +132,7 @@ on the number of tokens your categories have been trained with.
 - The POST payload should contain the raw text that you want to classify.
 
 
-### Score Text
+### Scoring Text
 
 ##### Endpoint
 ```
