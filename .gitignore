@@ -24,4 +24,4 @@ _testmain.go
 *.prof
 
 debug
-launch.json
+vendor/
