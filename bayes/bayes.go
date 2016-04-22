@@ -1,8 +1,9 @@
 package bayes
 
 import (
-	"github.com/hickeroar/gobayes/bayes/category"
 	"strings"
+
+	"github.com/hickeroar/gobayes/bayes/category"
 )
 
 // Classification is the result object from a classify action against the Classifier struct

@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/gorilla/mux"
-	"github.com/hickeroar/gobayes/bayes"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/gorilla/mux"
+	"github.com/hickeroar/gobayes/bayes"
 )
 
 // ClassifierAPI handles requests and holds our classifier
