@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// ClassifierAPI handles requests and holds our classifier
+// ClassifierAPI handles requests and holds our classifier instance
 type ClassifierAPI struct {
 	classifier bayes.Classifier
 }
@@ -22,6 +22,7 @@ func (c *ClassifierAPI) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/train/{category:[A-Za-z]+}", c.TrainHandler).Methods("POST")
 	r.HandleFunc("/classify", c.ClassifyHandler).Methods("POST")
 	r.HandleFunc("/score", c.ScoreHandler).Methods("POST")
+	r.HandleFunc("/flush", c.FlushHander).Methods("POST")
 }
 
 // InfoHandler outputs the current state of training
@@ -69,6 +70,15 @@ func (c *ClassifierAPI) ScoreHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	result := c.classifier.Score(string(body))
 	jsonResponse, _ := json.Marshal(result)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonResponse)
+}
+
+// FlushHander deletes all training data and gives us a fresh slate.
+func (c *ClassifierAPI) FlushHander(w http.ResponseWriter, req *http.Request) {
+	c.classifier.Flush()
+	jsonResponse, _ := json.Marshal(NewTrainingClassifierResponse(c, true))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(jsonResponse)

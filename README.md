@@ -119,10 +119,11 @@ any given token existing in that category vs other categories.
 /classify
 Accepts: POST
 ```
-The result is a simple object showing the Category classification and the
-classification Score that was calculated. The Score should not be relied on
-as any kind of specific indicator, as it's a relative score and varies based
-on the number of tokens your categories have been trained with.
+The result is of content-type "application/json" and contains a simple object
+showing the Category classification and the classification Score that was calculated.
+The Score should not be relied on as any kind of specific indicator, as it's a
+relative score and varies based on the number of tokens your categories have been
+trained with.
 ```
 {
     "Category": "spam",
@@ -139,10 +140,10 @@ on the number of tokens your categories have been trained with.
 /score
 Accepts: POST
 ```
-The result is a simple object showing the scores achieved by each category.
-As with classification, the scores should not be relied on as any kind of specific
-indicator, as it's a relative score and varies based on the number of tokens your
-categories have been trained with.
+The result of content-type "application/json" and contains is a simple object showing
+the scores achieved by each category. As with classification, the scores should not be
+relied on as any kind of specific indicator, as it's a relative score and varies based
+on the number of tokens your categories have been trained with.
 ```
 {
     "ham": 5.512455560425657,
@@ -150,3 +151,22 @@ categories have been trained with.
 }
 ```
 - The POST payload should contain the raw text that you want to score.
+
+
+### Flushing Training Data
+
+##### Endpoint
+```
+/flush
+Accepts: POST
+```
+The result of content-type "application/json" and contains a the list of categories
+that have been trained. This list should be empty, indicating that the classifier
+has been flushed.
+```
+{
+    "Success": true,
+    "Categories": {}
+}
+```
+- No payload or parameters are expected.
