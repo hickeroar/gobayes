@@ -29,6 +29,7 @@ What a classifier does is look at text and tell you how much that text
 $ go get github.com/hickeroar/gobayes
 ```
 
+---
 
 ## Usage
 ```
@@ -46,10 +47,11 @@ $ gobayes -port 8181
 Server is listening on port 8181.
 ```
 
+---
 
 ## Training the Classifier
 
-### Endpoint:
+#### Endpoint:
 ```
 /train/<string:category>
 Example: /train/spam
@@ -81,7 +83,7 @@ any given token existing in that category vs other categories.
 
 ## Getting Classifier Status
 
-### Endpoint:
+#### Endpoint:
 ```
 /info
 Accepts: GET
@@ -110,7 +112,7 @@ any given token existing in that category vs other categories.
 
 ## Classifying Text
 
-### Endpoint:
+#### Endpoint:
 ```
 /classify
 Accepts: POST
@@ -130,7 +132,7 @@ on the number of tokens your categories have been trained with.
 
 ## Score Text
 
-### Endpoint
+#### Endpoint
 ```
 /score
 Accepts: POST
