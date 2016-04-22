@@ -23,10 +23,12 @@ What a classifier does is look at text and tell you how much that text
 "looks like" other categories of text that it has been trained for.
 ```
 
+
 ## Installation
 ```
 $ go get github.com/hickeroar/gobayes
 ```
+
 
 ## Usage
 ```
@@ -44,9 +46,10 @@ $ gobayes -port 8181
 Server is listening on port 8181.
 ```
 
+
 ## Training the Classifier
 
-Endpoint:
+### Endpoint:
 ```
 /train/<string:category>
 Example: /train/spam
@@ -75,9 +78,10 @@ any given token existing in that category vs other categories.
 - The POST payload should contain the raw text that will train the classifier.
 - You can train a category as many times as you want.
 
-## Getting current Classifier status information
 
-Endpoint:
+## Getting Classifier Status
+
+### Endpoint:
 ```
 /info
 Accepts: GET
@@ -103,3 +107,42 @@ any given token existing in that category vs other categories.
 ```
 - No payload or parameters are expected.
 
+
+## Classifying Text
+
+### Endpoint:
+```
+/classify
+Accepts: POST
+```
+The result is a simple object showing the Category classification and the
+classification Score that was calculated. The Score should not be relied on
+as any kind of specific indicator, as it's a relative score and varies based
+on the number of tokens your categories have been trained with.
+```
+{
+    "Category": "spam",
+    "Score": 43.48754443957434
+}
+```
+- The POST payload should contain the raw text that you want to classify.
+
+
+## Score Text
+
+### Endpoint
+```
+/score
+Accepts: POST
+```
+The result is a simple object showing the scores achieved by each category.
+As with classification, the scores should not be relied on as any kind of specific
+indicator, as it's a relative score and varies based on the number of tokens your
+categories have been trained with.
+```
+{
+    "ham": 5.512455560425657,
+    "spam": 43.48754443957434
+}
+```
+- The POST payload should contain the raw text that you want to score.
