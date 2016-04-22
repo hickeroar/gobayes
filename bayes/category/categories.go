@@ -1,6 +1,6 @@
 package category
 
-// Categories represents all our trained categories and enables us to interact with them.
+// Categories represents all our trained categories and enables us to interact with them. test
 type Categories struct {
 	categories map[string]*Category // Map of category names to categories
 }
