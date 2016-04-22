@@ -2,7 +2,7 @@ package main
 
 // CategoryInfo a breakdown of a category's data
 type CategoryInfo struct {
-	Tally        int     // Total tokens in this category
+	TokenTally   int     // Total tokens in this category
 	ProbNotInCat float64 // The probability that any given token is in this category
 	ProbInCat    float64 // The probability that any given token is NOT in this category
 }
@@ -13,7 +13,7 @@ func getCategoryList(c *ClassifierAPI) map[string]*CategoryInfo {
 	list := make(map[string]*CategoryInfo)
 	for name, cat := range categories {
 		catInfo := &CategoryInfo{
-			Tally:        cat.Tally,
+			TokenTally:   cat.Tally,
 			ProbNotInCat: cat.ProbNotInCat,
 			ProbInCat:    cat.ProbInCat,
 		}
