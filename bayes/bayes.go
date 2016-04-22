@@ -8,7 +8,7 @@ import (
 
 // Classification is the result object from a classify action against the Classifier struct
 type Classification struct {
-	Category category.Category
+	Category string
 	Score    float64
 }
 
@@ -128,7 +128,7 @@ func (c *Classifier) Classify(text string) Classification {
 
 	for name, score := range scores {
 		if score > result.Score {
-			result.Category = *categories[name]
+			result.Category = categories[name].Name
 			result.Score = score
 		}
 	}
@@ -167,7 +167,8 @@ func (c *Classifier) Score(text string) map[string]float64 {
 
 		for name, tokenScore := range tokenScores {
 			probability := c.calculateBayesianProbability(*categories[name], tokenScore, tokenTally)
-			scores[name] += float64(count) * probability
+			fcount := float64(count)
+			scores[name] += fcount * probability
 		}
 	}
 
@@ -188,9 +189,9 @@ func (c *Classifier) calculateBayesianProbability(category category.Category, to
 	// P that any given token is NOT in this category
 	prnc := category.ProbNotInCat
 	// P that this token is NOT of this category
-	tokPrc := (tokenTally - tokenScore) / tokenTally
+	tokPrnc := (tokenTally - tokenScore) / tokenTally
 	// P that this token IS of this category
-	tokPrnc := tokenScore / tokenTally
+	tokPrc := tokenScore / tokenTally
 
 	numerator := tokPrc * prc
 	denominator := (tokPrnc * prnc) + numerator
