@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -43,6 +44,8 @@ func main() {
 
 	port := flag.String("port", "8000", "The port the server should listen on.")
 	flag.Parse()
+
+	fmt.Println("Server is listening on port " + *port + ".")
 
 	http.ListenAndServe(":"+*port, r)
 }
