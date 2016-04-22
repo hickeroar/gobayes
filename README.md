@@ -49,9 +49,11 @@ Server is listening on port 8181.
 
 ---
 
-## Training the Classifier
+## Using the Classifier
 
-#### Endpoint:
+### Training the Classifier
+
+##### Endpoint:
 ```
 /train/<string:category>
 Example: /train/spam
@@ -81,9 +83,9 @@ any given token existing in that category vs other categories.
 - You can train a category as many times as you want.
 
 
-## Getting Classifier Status
+### Getting Classifier Status
 
-#### Endpoint:
+##### Endpoint:
 ```
 /info
 Accepts: GET
@@ -110,9 +112,9 @@ any given token existing in that category vs other categories.
 - No payload or parameters are expected.
 
 
-## Classifying Text
+### Classifying Text
 
-#### Endpoint:
+##### Endpoint:
 ```
 /classify
 Accepts: POST
@@ -130,9 +132,9 @@ on the number of tokens your categories have been trained with.
 - The POST payload should contain the raw text that you want to classify.
 
 
-## Score Text
+### Score Text
 
-#### Endpoint
+##### Endpoint
 ```
 /score
 Accepts: POST
