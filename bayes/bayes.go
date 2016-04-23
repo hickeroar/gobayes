@@ -98,6 +98,7 @@ func (c *Classifier) Train(category string, text string) {
 		cat.TrainToken(token, count)
 	}
 
+	c.cleanUpCategory(cat)
 	c.calculateCategoryProbabilities()
 }
 
@@ -112,7 +113,16 @@ func (c *Classifier) Untrain(category string, text string) {
 		cat.UntrainToken(token, count)
 	}
 
+	c.cleanUpCategory(cat)
 	c.calculateCategoryProbabilities()
+}
+
+// cleanUpCategory does cleanup operations on a category that might need them
+func (c *Classifier) cleanUpCategory(cat *category.Category) {
+	// If there are no tokens in this category, we delete the category.
+	if cat.Tally == 0 {
+		c.Categories.DeleteCategory(cat.Name)
+	}
 }
 
 // Classify executes bayesian scoring on the sample and returns the highest scoring item

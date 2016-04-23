@@ -20,6 +20,7 @@ type ClassifierAPI struct {
 func (c *ClassifierAPI) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/info", c.InfoHandler).Methods("GET")
 	r.HandleFunc("/train/{category:[A-Za-z]+}", c.TrainHandler).Methods("POST")
+	r.HandleFunc("/untrain/{category:[A-Za-z]+}", c.UntrainHandler).Methods("POST")
 	r.HandleFunc("/classify", c.ClassifyHandler).Methods("POST")
 	r.HandleFunc("/score", c.ScoreHandler).Methods("POST")
 	r.HandleFunc("/flush", c.FlushHander).Methods("POST")
@@ -40,9 +41,21 @@ func (c *ClassifierAPI) TrainHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		panic("Unable to Read Request Body")
 	}
-	if len(body) > 0 && len(category) > 0 {
-		c.classifier.Train(category, string(body))
+	c.classifier.Train(category, string(body))
+	jsonResponse, _ := json.Marshal(NewTrainingClassifierResponse(c, true))
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonResponse)
+}
+
+// UntrainHandler handles requests to untrain the classifier
+func (c *ClassifierAPI) UntrainHandler(w http.ResponseWriter, req *http.Request) {
+	category := mux.Vars(req)["category"]
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		panic("Unable to Read Request Body")
 	}
+	c.classifier.Untrain(category, string(body))
 	jsonResponse, _ := json.Marshal(NewTrainingClassifierResponse(c, true))
 
 	w.Header().Set("Content-Type", "application/json")

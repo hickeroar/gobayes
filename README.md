@@ -83,6 +83,38 @@ any given token existing in that category vs other categories.
 - You can train a category as many times as you want.
 
 
+### Untraining the Classifier
+
+##### Endpoint:
+```
+/untrain/<string:category>
+Example: /untrain/spam
+Accepts: POST
+```
+The result is of content-type "application/json" and contains a breakdown of each trained
+category including the total text tokens that category contains, and the probabilities of
+any given token existing in that category vs other categories.
+```
+{
+    "Success": true,
+    "Categories": {
+        "ham": {
+            "TokenTally": 1864,
+            "ProbNotInCat": 0.540093757710338,
+            "ProbInCat": 0.459906242289662
+        },
+        "spam": {
+            "TokenTally": 2189,
+            "ProbNotInCat": 0.4599062422896619,
+            "ProbInCat": 0.5400937577103381
+        }
+    }
+}
+```
+- The POST payload should contain the raw text that will untrain the classifier.
+- If there are no remaining tokens in a category, that category will be removed.
+
+
 ### Getting Classifier Status
 
 ##### Endpoint:

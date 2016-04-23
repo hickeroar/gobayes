@@ -34,18 +34,17 @@ func (cat *Category) TrainToken(word string, count int) {
 
 // UntrainToken untrains a specific token on this category
 func (cat *Category) UntrainToken(word string, count int) {
-	// If the token isn't defined we just return
-	if _, ok := cat.Tokens[word]; ok {
-		return
-	}
+	curCount, keyExists := cat.Tokens[word]
 
-	// if we're removing equal or more counts than we have, we kill the token
-	if count >= cat.Tokens[word] {
-		cat.Tally -= cat.Tokens[word]
-		delete(cat.Tokens, word)
-	} else {
-		cat.Tokens[word] -= count
-		cat.Tally -= count
+	if keyExists {
+		// if we're removing equal or more counts than we have, we kill the token
+		if count >= curCount {
+			cat.Tally -= cat.Tokens[word]
+			delete(cat.Tokens, word)
+		} else {
+			cat.Tokens[word] -= count
+			cat.Tally -= count
+		}
 	}
 }
 

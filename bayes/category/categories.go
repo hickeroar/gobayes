@@ -31,6 +31,11 @@ func (cats *Categories) GetCategory(name string) *Category {
 	return cats.AddCategory(name)
 }
 
+// DeleteCategory removes a category from the list of categories
+func (cats *Categories) DeleteCategory(name string) {
+	delete(cats.categories, name)
+}
+
 // GetCategories returns the map of all categories
 func (cats *Categories) GetCategories() map[string]*Category {
 	return cats.categories
