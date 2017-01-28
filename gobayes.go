@@ -7,8 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"./bayes"
 	"github.com/gorilla/mux"
+	"github.com/hickeroar/gobayes/bayes"
 )
 
 // ClassifierAPI handles requests and holds our classifier instance
