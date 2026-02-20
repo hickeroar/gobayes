@@ -1,37 +1,40 @@
 package bayes
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/hickeroar/gobayes/bayes/category"
 )
 
-// Classification is the result object from a classify action against the Classifier struct
+// Classification is the result of classifying a text sample.
 type Classification struct {
-	Category string
-	Score    float64
+	Category string  `json:"Category"`
+	Score    float64 `json:"Score"`
 }
 
-// Classifier is responsible for classifying text samples
+// Classifier trains text categories and classifies new text samples.
+//
+// Classifier is not safe for concurrent use without external synchronization.
 type Classifier struct {
 	Categories category.Categories
 	Tokenizer  func(string) []string
 }
 
-// NewClassifier returns a pointer to a instance of type Classifier
+// NewClassifier returns a new Classifier instance.
 func NewClassifier() *Classifier {
 	return &Classifier{
 		Categories: *category.NewCategories(),
 	}
 }
 
-// Breaks our string into tokens which will be used to train the classifier
+// tokenizeText lowercases and tokenizes text using whitespace separation.
 func (c *Classifier) tokenizeText(sample string) []string {
 	sample = strings.ToLower(sample)
 	return strings.Fields(sample)
 }
 
-// Returns the tokenizer that we're going to tokenize the text with
+// getTokenizer returns the configured tokenizer or the default tokenizer.
 func (c *Classifier) getTokenizer() func(string) []string {
 	if c.Tokenizer == nil {
 		return c.tokenizeText
@@ -39,29 +42,29 @@ func (c *Classifier) getTokenizer() func(string) []string {
 	return c.Tokenizer
 }
 
-// Counts the total occurances of every token in a given string
+// countTokenOccurances counts token frequencies in a token slice.
 func (c *Classifier) countTokenOccurances(tokens []string) map[string]int {
 	occurances := make(map[string]int)
 
 	for _, token := range tokens {
-		if _, ok := occurances[token]; ok {
-			occurances[token]++
-		} else {
-			occurances[token] = 1
-		}
+		occurances[token]++
 	}
 
 	return occurances
 }
 
-// Calculates and caches the probabilities that tokens are in (or aren't in) each of our categories
+// calculateCategoryProbabilities updates each category prior probability values.
 func (c *Classifier) calculateCategoryProbabilities() {
 	totalTally := 0.0
 	probabilities := make(map[string]float64)
 
 	// Tallying up the tallies for each category
-	for name, category := range c.Categories.GetCategories() {
-		probabilities[name] = float64(category.GetTally())
+	for _, name := range c.Categories.Names() {
+		cat, ok := c.Categories.LookupCategory(name)
+		if !ok {
+			continue
+		}
+		probabilities[name] = float64(cat.GetTally())
 		totalTally += probabilities[name]
 	}
 
@@ -76,18 +79,16 @@ func (c *Classifier) calculateCategoryProbabilities() {
 
 	// Calculating the probability that any given token is NOT in each category, and storing values on the category
 	for name, probability := range probabilities {
-		cat := c.Categories.GetCategory(name)
-		cat.ProbInCat = probability
-		cat.ProbNotInCat = 1.0 - probability
+		c.Categories.SetCategoryProbabilities(name, probability, 1.0-probability)
 	}
 }
 
-// Flush empties the categories to remove all values
+// Flush resets all trained categories.
 func (c *Classifier) Flush() {
 	c.Categories = *category.NewCategories()
 }
 
-// Train takes a text sample and trains a category with it
+// Train updates a category with token counts from a text sample.
 func (c *Classifier) Train(category string, text string) {
 	cat := c.Categories.GetCategory(category)
 
@@ -95,14 +96,16 @@ func (c *Classifier) Train(category string, text string) {
 	occurances := c.countTokenOccurances(tokens)
 
 	for token, count := range occurances {
-		cat.TrainToken(token, count)
+		if err := cat.TrainToken(token, count); err != nil {
+			continue
+		}
 	}
 
 	c.cleanUpCategory(cat)
 	c.calculateCategoryProbabilities()
 }
 
-// Untrain takes a text sample and untrains a category with it
+// Untrain removes token counts from a category using a text sample.
 func (c *Classifier) Untrain(category string, text string) {
 	cat := c.Categories.GetCategory(category)
 
@@ -110,35 +113,43 @@ func (c *Classifier) Untrain(category string, text string) {
 	occurances := c.countTokenOccurances(tokens)
 
 	for token, count := range occurances {
-		cat.UntrainToken(token, count)
+		if err := cat.UntrainToken(token, count); err != nil {
+			continue
+		}
 	}
 
 	c.cleanUpCategory(cat)
 	c.calculateCategoryProbabilities()
 }
 
-// cleanUpCategory does cleanup operations on a category that might need them
+// cleanUpCategory removes an empty category.
 func (c *Classifier) cleanUpCategory(cat *category.Category) {
 	// If there are no tokens in this category, we delete the category.
-	if cat.Tally == 0 {
-		c.Categories.DeleteCategory(cat.Name)
+	if cat.GetTally() == 0 {
+		c.Categories.DeleteCategory(cat.Name())
 	}
 }
 
-// Classify executes bayesian scoring on the sample and returns the highest scoring item
+// Classify scores text against all categories and returns the best match.
 func (c *Classifier) Classify(text string) Classification {
 	scores := c.Score(text)
-	result := *new(Classification)
-	categories := c.Categories.GetCategories()
+	result := Classification{}
 
 	// If we had no scores returned we just return the Classification object without a category
 	if len(scores) == 0 {
 		return result
 	}
 
-	for name, score := range scores {
+	names := make([]string, 0, len(scores))
+	for name := range scores {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		score := scores[name]
 		if score > result.Score {
-			result.Category = categories[name].Name
+			result.Category = name
 			result.Score = score
 		}
 	}
@@ -146,7 +157,7 @@ func (c *Classifier) Classify(text string) Classification {
 	return result
 }
 
-// Score determines/scores the bayes probability for each of our categories, given a sample of text
+// Score computes Bayesian scores for each category given a text sample.
 func (c *Classifier) Score(text string) map[string]float64 {
 
 	tokens := c.getTokenizer()(text)
@@ -154,8 +165,8 @@ func (c *Classifier) Score(text string) map[string]float64 {
 
 	// Map to hold all scores for all categories
 	scores := make(map[string]float64)
-	categories := c.Categories.GetCategories()
-	for key := range categories {
+	categoryNames := c.Categories.Names()
+	for _, key := range categoryNames {
 		scores[key] = 0.0
 	}
 
@@ -165,8 +176,12 @@ func (c *Classifier) Score(text string) map[string]float64 {
 		tokenTally := 0.0
 
 		// Getting the tallies of this token from all categories
-		for name, category := range categories {
-			tokenScores[name] = float64(category.GetTokenCount(word))
+		for _, name := range categoryNames {
+			cat, ok := c.Categories.LookupCategory(name)
+			if !ok {
+				continue
+			}
+			tokenScores[name] = float64(cat.GetTokenCount(word))
 			tokenTally += tokenScores[name]
 		}
 
@@ -176,7 +191,11 @@ func (c *Classifier) Score(text string) map[string]float64 {
 		}
 
 		for name, tokenScore := range tokenScores {
-			probability := c.calculateBayesianProbability(*categories[name], tokenScore, tokenTally)
+			cat, ok := c.Categories.LookupCategory(name)
+			if !ok {
+				continue
+			}
+			probability := c.calculateBayesianProbability(*cat, tokenScore, tokenTally)
 			fcount := float64(count)
 			scores[name] += fcount * probability
 		}
@@ -192,12 +211,12 @@ func (c *Classifier) Score(text string) map[string]float64 {
 	return finalScores
 }
 
-// Takes a category and some scoring values and returns a bayesian probability
+// calculateBayesianProbability computes the Bayesian probability for one category.
 func (c *Classifier) calculateBayesianProbability(category category.Category, tokenScore float64, tokenTally float64) float64 {
 	// P that any given token IS in this category
-	prc := category.ProbInCat
+	prc := category.GetProbInCat()
 	// P that any given token is NOT in this category
-	prnc := category.ProbNotInCat
+	prnc := category.GetProbNotInCat()
 	// P that this token is NOT of this category
 	tokPrnc := (tokenTally - tokenScore) / tokenTally
 	// P that this token IS of this category

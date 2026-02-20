@@ -1,5 +1,5 @@
 # GoBayes
-A web api providing memory-based naïve bayesian text classification.
+A Go package and web API for memory-based naive Bayesian text classification.
 
 ---
 
@@ -26,30 +26,95 @@ What a classifier does is look at text and tell you how much that text
 
 ## Installation
 ```
+$ git clone https://github.com/hickeroar/gobayes.git
+$ cd gobayes
+$ go build ./...
+```
+
+If you only want to use Gobayes as a library in your own app, add it as a dependency:
+```
 $ go get github.com/hickeroar/gobayes
 ```
 
 ---
 
-## Usage
+## Run as an API Server
 ```
-$ gobayes
+$ go run .
 Server is listening on port 8000.
 ```
 ```
-$ gobayes -help
+go run . -help
 Usage of gobayes:
   -port string
         The port the server should listen on. (default "8000")
 ```
 ```
-$ gobayes -port 8181
+$ go run . -port 8181
 Server is listening on port 8181.
+```
+
+## Use as a Library in Your App
+
+Import the library package:
+```go
+import "github.com/hickeroar/gobayes/bayes"
+```
+
+Basic example:
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/hickeroar/gobayes/bayes"
+)
+
+func main() {
+	classifier := bayes.NewClassifier()
+
+	classifier.Train("spam", "buy now limited offer click here")
+	classifier.Train("ham", "team meeting schedule for tomorrow")
+
+	classification := classifier.Classify("limited offer today")
+	fmt.Printf("category=%s score=%f\n", classification.Category, classification.Score)
+
+	scores := classifier.Score("team schedule update")
+	fmt.Printf("scores=%v\n", scores)
+
+	classifier.Untrain("spam", "buy now limited offer click here")
+}
+```
+
+Notes for library usage:
+- `Classifier` is not goroutine-safe by itself; guard shared instances with your own synchronization.
+- State is in memory only; restart/recreate means retraining unless you persist training data externally.
+- Scores are relative values and should be compared within the same model, not treated as calibrated probabilities.
+
+## Development Checks
+```
+$ go test ./...
+$ go test -race ./...
 ```
 
 ---
 
-## Using the Classifier
+## Using the HTTP API
+
+### API Notes
+- Category names in `/train/<category>` and `/untrain/<category>` must match `^[-_A-Za-z0-9]+$`.
+- Request body size is capped at 1 MiB.
+- Error responses use JSON format: `{"error":"<message>"}`.
+- This service stores classifier state in memory only; restarting the process clears training data.
+
+### Common Error Responses
+| Status | When |
+| --- | --- |
+| `400` | Invalid request body |
+| `404` | Invalid category route |
+| `405` | Wrong HTTP method (`Allow` header is included) |
+| `413` | Request body exceeds 1 MiB |
 
 ### Training the Classifier
 
@@ -202,3 +267,16 @@ has been flushed.
 }
 ```
 - No payload or parameters are expected.
+
+### Health and Readiness
+##### Liveness endpoint
+```
+/healthz
+Accepts: GET
+```
+
+##### Readiness endpoint
+```
+/readyz
+Accepts: GET
+```
