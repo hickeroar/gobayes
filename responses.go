@@ -1,19 +1,19 @@
 package main
 
-// CategoryInfo a breakdown of a category's data
+// CategoryInfo describes summary data for a trained category.
 type CategoryInfo struct {
-	TokenTally   int     // Total tokens in this category
-	ProbNotInCat float64 // The probability that any given token is in this category
-	ProbInCat    float64 // The probability that any given token is NOT in this category
+	TokenTally   int     `json:"TokenTally"`   // Total tokens in this category
+	ProbNotInCat float64 `json:"ProbNotInCat"` // Probability that an arbitrary token is not in this category
+	ProbInCat    float64 `json:"ProbInCat"`    // Probability that an arbitrary token is in this category
 }
 
-// getCategoryList returns a simple list of all categories
+// getCategoryList returns a summary view of all categories.
 func getCategoryList(c *ClassifierAPI) map[string]*CategoryInfo {
-	categories := c.classifier.Categories.GetCategories()
+	categories := c.classifier.Categories.Summaries()
 	list := make(map[string]*CategoryInfo)
 	for name, cat := range categories {
 		catInfo := &CategoryInfo{
-			TokenTally:   cat.Tally,
+			TokenTally:   cat.TokenTally,
 			ProbNotInCat: cat.ProbNotInCat,
 			ProbInCat:    cat.ProbInCat,
 		}
@@ -22,13 +22,13 @@ func getCategoryList(c *ClassifierAPI) map[string]*CategoryInfo {
 	return list
 }
 
-// TrainingClassifierResponse is a standard response from the api displaying the list of categories and success bool
+// TrainingClassifierResponse is returned by train, untrain, and flush endpoints.
 type TrainingClassifierResponse struct {
-	Success    bool
-	Categories map[string]*CategoryInfo
+	Success    bool                     `json:"Success"`
+	Categories map[string]*CategoryInfo `json:"Categories"`
 }
 
-// NewTrainingClassifierResponse Gets an assembled instance of TrainingClassifierResponse
+// NewTrainingClassifierResponse builds a TrainingClassifierResponse.
 func NewTrainingClassifierResponse(c *ClassifierAPI, success bool) *TrainingClassifierResponse {
 	return &TrainingClassifierResponse{
 		Success:    success,
@@ -36,12 +36,12 @@ func NewTrainingClassifierResponse(c *ClassifierAPI, success bool) *TrainingClas
 	}
 }
 
-// InfoClassifierResponse is a standard response from the api displaying the list of categories and success bool
+// InfoClassifierResponse is returned by the info endpoint.
 type InfoClassifierResponse struct {
-	Categories map[string]*CategoryInfo
+	Categories map[string]*CategoryInfo `json:"Categories"`
 }
 
-// NewInfoClassifierResponse Gets an assembled instance of TrainingClassifierResponse
+// NewInfoClassifierResponse builds an InfoClassifierResponse.
 func NewInfoClassifierResponse(c *ClassifierAPI) *InfoClassifierResponse {
 	return &InfoClassifierResponse{
 		Categories: getCategoryList(c),

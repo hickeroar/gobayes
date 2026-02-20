@@ -1,27 +1,39 @@
 package category
 
-// Categories represents all our trained categories and enables us to interact with them.
-type Categories struct {
-	categories map[string]*Category // Map of category names to categories
+import "fmt"
+
+// CategorySummary is a read-only summary used by API responses.
+type CategorySummary struct {
+	TokenTally   int
+	ProbNotInCat float64
+	ProbInCat    float64
 }
 
-// NewCategories returns a pointer to a instance of type Categories
+// Categories stores and manages trained Category values.
+type Categories struct {
+	categories         map[string]*Category // Map of category names to categories
+	probabilitiesDirty bool
+}
+
+// NewCategories returns an initialized Categories collection.
 func NewCategories() *Categories {
 	return &Categories{
-		categories: make(map[string]*Category),
+		categories:         make(map[string]*Category),
+		probabilitiesDirty: true,
 	}
 }
 
-// AddCategory is responsible for adding a new trainable category
+// AddCategory creates and stores a new category by name.
 func (cats *Categories) AddCategory(name string) *Category {
 	cat := NewCategory(name)
 
 	cats.categories[name] = cat
+	cats.probabilitiesDirty = true
 
-	return cats.GetCategory(name)
+	return cat
 }
 
-// GetCategory returns a specified category
+// GetCategory returns the category by name, creating it when missing.
 func (cats *Categories) GetCategory(name string) *Category {
 	if val, ok := cats.categories[name]; ok {
 		return val
@@ -31,12 +43,112 @@ func (cats *Categories) GetCategory(name string) *Category {
 	return cats.AddCategory(name)
 }
 
-// DeleteCategory removes a category from the list of categories
+// DeleteCategory removes a category by name.
 func (cats *Categories) DeleteCategory(name string) {
 	delete(cats.categories, name)
+	cats.probabilitiesDirty = true
 }
 
-// GetCategories returns the map of all categories
-func (cats *Categories) GetCategories() map[string]*Category {
-	return cats.categories
+// Names returns all known category names.
+func (cats *Categories) Names() []string {
+	names := make([]string, 0, len(cats.categories))
+	for name := range cats.categories {
+		names = append(names, name)
+	}
+	return names
+}
+
+// LookupCategory returns a category by name without creating one.
+func (cats *Categories) LookupCategory(name string) (*Category, bool) {
+	cat, ok := cats.categories[name]
+	return cat, ok
+}
+
+// SetCategoryProbabilities updates derived probability fields for an existing category.
+func (cats *Categories) SetCategoryProbabilities(name string, probInCat float64, probNotInCat float64) {
+	if cat, ok := cats.categories[name]; ok {
+		cat.setProbabilities(probInCat, probNotInCat)
+	}
+}
+
+// MarkProbabilitiesDirty marks cached priors for recalculation.
+func (cats *Categories) MarkProbabilitiesDirty() {
+	cats.probabilitiesDirty = true
+}
+
+// EnsureCategoryProbabilities recalculates priors when data has changed.
+func (cats *Categories) EnsureCategoryProbabilities() {
+	if !cats.probabilitiesDirty {
+		return
+	}
+
+	totalTally := 0.0
+	probabilities := make(map[string]float64, len(cats.categories))
+
+	for name, cat := range cats.categories {
+		tally := float64(cat.GetTally())
+		probabilities[name] = tally
+		totalTally += tally
+	}
+
+	for name, tally := range probabilities {
+		probability := 0.0
+		if totalTally > 0.0 {
+			probability = tally / totalTally
+		}
+		cats.SetCategoryProbabilities(name, probability, 1.0-probability)
+	}
+
+	cats.probabilitiesDirty = false
+}
+
+// Summaries returns a response-oriented snapshot of category data.
+func (cats *Categories) Summaries() map[string]CategorySummary {
+	cats.EnsureCategoryProbabilities()
+
+	snapshot := make(map[string]CategorySummary, len(cats.categories))
+	for name, cat := range cats.categories {
+		snapshot[name] = CategorySummary{
+			TokenTally:   cat.GetTally(),
+			ProbNotInCat: cat.GetProbNotInCat(),
+			ProbInCat:    cat.GetProbInCat(),
+		}
+	}
+	return snapshot
+}
+
+// ExportStates returns a deep-copy snapshot of all categories for persistence.
+func (cats *Categories) ExportStates() map[string]PersistedCategory {
+	states := make(map[string]PersistedCategory, len(cats.categories))
+	for name, cat := range cats.categories {
+		states[name] = cat.exportState()
+	}
+	return states
+}
+
+// ReplaceStates replaces all categories from a persisted state snapshot.
+func (cats *Categories) ReplaceStates(states map[string]PersistedCategory) error {
+	next := make(map[string]*Category, len(states))
+
+	for name, state := range states {
+		cat := NewCategory(name)
+		sum := 0
+		for token, count := range state.Tokens {
+			if count <= 0 {
+				return fmt.Errorf("invalid token count for %q token %q: %d", name, token, count)
+			}
+			cat.tokens[token] = count
+			sum += count
+		}
+
+		if sum != state.Tally {
+			return fmt.Errorf("invalid tally for %q: tally=%d sum=%d", name, state.Tally, sum)
+		}
+		cat.tally = state.Tally
+		next[name] = cat
+	}
+
+	cats.categories = next
+	cats.probabilitiesDirty = true
+	return nil
 }

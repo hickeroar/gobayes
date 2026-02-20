@@ -1,69 +1,110 @@
 package category
 
-// Category represents a single text category
+import "errors"
+
+// ErrInvalidTokenCount indicates token mutation was requested with a non-positive count.
+var ErrInvalidTokenCount = errors.New("count must be greater than zero")
+
+// Category stores token and probability data for one classification category.
 type Category struct {
-	Name         string         // Name of this category
-	Tokens       map[string]int // Map of tokens to their count
-	Tally        int            // Total tokens in this category
-	ProbNotInCat float64        // The probability that any given token is in this category
-	ProbInCat    float64        // The probability that any given token is NOT in this category
+	name         string         // Name of this category
+	tokens       map[string]int // Map of tokens to their count
+	tally        int            // Total tokens in this category
+	probNotInCat float64        // Probability that an arbitrary token is not in this category
+	probInCat    float64        // Probability that an arbitrary token is in this category
 }
 
-// NewCategory returns a pointer to a instance of type Category
+// PersistedCategory is a serializable representation of Category data.
+type PersistedCategory struct {
+	Tokens map[string]int
+	Tally  int
+}
+
+// NewCategory returns a new Category with initialized token storage.
 func NewCategory(name string) *Category {
 	return &Category{
-		Name:         name,
-		Tokens:       make(map[string]int),
-		Tally:        0,
-		ProbNotInCat: 0.0,
-		ProbInCat:    0.0,
+		name:         name,
+		tokens:       make(map[string]int),
+		tally:        0,
+		probNotInCat: 0.0,
+		probInCat:    0.0,
 	}
 }
 
-// TrainToken trains a specific token on this category
-func (cat *Category) TrainToken(word string, count int) {
-	// Creating the token if it doesn't exist, otherwise incrementing it
-	if _, ok := cat.Tokens[word]; ok {
-		cat.Tokens[word] += count
-	} else {
-		cat.Tokens[word] = count
+// TrainToken adds count occurrences of word to the category.
+func (cat *Category) TrainToken(word string, count int) error {
+	if count <= 0 {
+		return ErrInvalidTokenCount
 	}
 
-	cat.Tally += count
+	cat.tokens[word] += count
+
+	cat.tally += count
+	return nil
 }
 
-// UntrainToken untrains a specific token on this category
-func (cat *Category) UntrainToken(word string, count int) {
-	curCount, keyExists := cat.Tokens[word]
+// UntrainToken removes count occurrences of word from the category.
+func (cat *Category) UntrainToken(word string, count int) error {
+	if count <= 0 {
+		return ErrInvalidTokenCount
+	}
+
+	curCount, keyExists := cat.tokens[word]
 
 	if keyExists {
 		// if we're removing equal or more counts than we have, we kill the token
 		if count >= curCount {
-			cat.Tally -= cat.Tokens[word]
-			delete(cat.Tokens, word)
+			cat.tally -= cat.tokens[word]
+			delete(cat.tokens, word)
 		} else {
-			cat.Tokens[word] -= count
-			cat.Tally -= count
+			cat.tokens[word] -= count
+			cat.tally -= count
 		}
 	}
+	return nil
 }
 
-// GetTokenCount returns at tokens count from this category
-func (cat *Category) GetTokenCount(word string) int {
-	if val, ok := cat.Tokens[word]; ok {
+// Name returns the category name.
+func (cat Category) Name() string {
+	return cat.name
+}
+
+// GetTokenCount returns the number of times word appears in the category.
+func (cat Category) GetTokenCount(word string) int {
+	if val, ok := cat.tokens[word]; ok {
 		return val
 	}
 	return 0
 }
 
-// GetTally returns the total of all tokens for this category
-func (cat *Category) GetTally() int {
-	return cat.Tally
+// GetTally returns the total trained token count for this category.
+func (cat Category) GetTally() int {
+	return cat.tally
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+// GetProbInCat returns the prior probability for the category.
+func (cat Category) GetProbInCat() float64 {
+	return cat.probInCat
+}
+
+// GetProbNotInCat returns the complement prior probability for the category.
+func (cat Category) GetProbNotInCat() float64 {
+	return cat.probNotInCat
+}
+
+func (cat *Category) setProbabilities(probInCat float64, probNotInCat float64) {
+	cat.probInCat = probInCat
+	cat.probNotInCat = probNotInCat
+}
+
+func (cat *Category) exportState() PersistedCategory {
+	tokens := make(map[string]int, len(cat.tokens))
+	for token, count := range cat.tokens {
+		tokens[token] = count
 	}
-	return b
+
+	return PersistedCategory{
+		Tokens: tokens,
+		Tally:  cat.tally,
+	}
 }
