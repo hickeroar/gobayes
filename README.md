@@ -44,15 +44,29 @@ $ go run .
 Server is listening on port 8000.
 ```
 ```
-go run . -help
+go run . --help
 Usage of gobayes:
+  -auth-token string
+        Optional bearer token required for all endpoints except /healthz and /readyz.
   -port string
         The port the server should listen on. (default "8000")
 ```
 ```
-$ go run . -port 8181
+$ go run . --port 8181
 Server is listening on port 8181.
 ```
+```
+$ go run . --port 8181 --auth-token my-secret-token
+Server is listening on port 8181.
+```
+
+When `--auth-token` is set, all API endpoints except `/healthz` and `/readyz` require:
+
+```
+Authorization: Bearer <token>
+```
+
+Note: both single-hyphen and double-hyphen forms are accepted for flags, but examples use double-hyphen for consistency with common CLI conventions.
 
 ## Use as a Library in Your App
 
@@ -313,6 +327,8 @@ Accepts: GET
 /readyz
 Accepts: GET
 ```
+
+`/healthz` and `/readyz` are intentionally unauthenticated so infrastructure probes can reach them even when API auth is enabled.
 
 ## Operational Notes
 - The HTTP server stores training data in memory only. Process restarts and deploy rollouts wipe model state unless your app replays training events.

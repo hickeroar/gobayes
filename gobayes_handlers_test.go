@@ -44,6 +44,11 @@ func newTestServer() (*ClassifierAPI, *http.ServeMux) {
 	return api, mux
 }
 
+func newTestServerWithAuth(token string) (*ClassifierAPI, http.Handler) {
+	api, mux := newTestServer()
+	return api, withAuthorizationToken(mux, token)
+}
+
 func TestClassifyMethodNotAllowed(t *testing.T) {
 	_, mux := newTestServer()
 	req := httptest.NewRequest(http.MethodGet, "/classify", nil)
@@ -58,6 +63,69 @@ func TestClassifyMethodNotAllowed(t *testing.T) {
 		t.Fatalf("unexpected Allow header: got %q, want %q", allow, http.MethodPost)
 	}
 	assertJSONErrorShape(t, rr)
+}
+
+func TestAuthorizationMiddlewareRejectsInvalidOrMissingToken(t *testing.T) {
+	_, handler := newTestServerWithAuth("secret-token")
+
+	tests := []struct {
+		name   string
+		header string
+	}{
+		{name: "missing header", header: ""},
+		{name: "wrong scheme", header: "Basic secret-token"},
+		{name: "missing bearer token", header: "Bearer"},
+		{name: "wrong token", header: "Bearer wrong-token"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/info", nil)
+			if tc.header != "" {
+				req.Header.Set("Authorization", tc.header)
+			}
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusUnauthorized {
+				t.Fatalf("unexpected status: got %d, want %d", rr.Code, http.StatusUnauthorized)
+			}
+			if got := rr.Header().Get("WWW-Authenticate"); got != `Bearer realm="gobayes"` {
+				t.Fatalf("unexpected WWW-Authenticate header: got %q", got)
+			}
+			assertJSONErrorShape(t, rr)
+		})
+	}
+}
+
+func TestAuthorizationMiddlewareAllowsProtectedEndpointWithValidToken(t *testing.T) {
+	_, handler := newTestServerWithAuth("secret-token")
+	req := httptest.NewRequest(http.MethodGet, "/info", nil)
+	req.Header.Set("Authorization", "Bearer secret-token")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("unexpected status: got %d, want %d", rr.Code, http.StatusOK)
+	}
+	assertJSONContentType(t, rr)
+}
+
+func TestAuthorizationMiddlewareBypassesHealthAndReady(t *testing.T) {
+	api, handler := newTestServerWithAuth("secret-token")
+	api.ready.Store(true)
+
+	for _, path := range []string{"/healthz", "/readyz"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("unexpected status for %s: got %d, want %d", path, rr.Code, http.StatusOK)
+		}
+		assertJSONContentType(t, rr)
+	}
 }
 
 func TestTrainInfoFlushLifecycle(t *testing.T) {

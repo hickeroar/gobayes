@@ -13,7 +13,6 @@ jobs:
       fail-fast: false
       matrix:
         go-version:
-          - "1.25.7"
           - "1.26.x"
     runs-on: ubuntu-latest
     steps:

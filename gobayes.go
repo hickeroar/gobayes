@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -52,9 +53,15 @@ var (
 		controller.RegisterRoutes(mux)
 
 		port := flag.String("port", "8000", "The port the server should listen on.")
+		authToken := flag.String("auth-token", "", "Optional bearer token required for all endpoints except /healthz and /readyz.")
 		flag.Parse()
 
-		server := newServer(":"+*port, mux)
+		var handler http.Handler = mux
+		if *authToken != "" {
+			handler = withAuthorizationToken(handler, *authToken)
+		}
+
+		server := newServer(":"+*port, handler)
 		log.Printf("Server is listening on port %s.", *port)
 
 		go func() {
@@ -150,6 +157,31 @@ func requireMethod(w http.ResponseWriter, req *http.Request, method string) bool
 		return false
 	}
 	return true
+}
+
+func withAuthorizationToken(next http.Handler, expectedToken string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/healthz" || req.URL.Path == "/readyz" {
+			next.ServeHTTP(w, req)
+			return
+		}
+
+		authHeader := req.Header.Get("Authorization")
+		scheme, providedToken, ok := strings.Cut(authHeader, " ")
+		if !ok || !strings.EqualFold(scheme, "Bearer") || providedToken == "" {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="gobayes"`)
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+
+		if subtle.ConstantTimeCompare([]byte(providedToken), []byte(expectedToken)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="gobayes"`)
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+
+		next.ServeHTTP(w, req)
+	})
 }
 
 // InfoHandler returns the current classifier training state.
