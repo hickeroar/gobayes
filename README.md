@@ -33,7 +33,7 @@ $ go build ./...
 
 If you only want to use Gobayes as a library in your own app, add it as a dependency:
 ```
-$ go get github.com/hickeroar/gobayes
+$ go get github.com/hickeroar/gobayes/v2
 ```
 
 ---
@@ -58,7 +58,7 @@ Server is listening on port 8181.
 
 Import the library package:
 ```go
-import "github.com/hickeroar/gobayes/bayes"
+import "github.com/hickeroar/gobayes/v2/bayes"
 ```
 
 Basic example:
@@ -68,7 +68,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/hickeroar/gobayes/bayes"
+	"github.com/hickeroar/gobayes/v2/bayes"
 )
 
 func main() {
@@ -91,6 +91,7 @@ Notes for library usage:
 - `Classifier` is not goroutine-safe by itself; guard shared instances with your own synchronization.
 - State is in memory only; restart/recreate means retraining unless you persist training data externally.
 - Scores are relative values and should be compared within the same model, not treated as calibrated probabilities.
+- Category names accepted by `Train`/`Untrain` match `^[-_A-Za-z0-9]+$`; invalid names are ignored.
 
 ## Development Checks
 ```
@@ -280,3 +281,8 @@ Accepts: GET
 /readyz
 Accepts: GET
 ```
+
+## Operational Notes
+- Training data is in memory only. Process restarts and deploy rollouts wipe model state unless your app replays training events.
+- Treat Gobayes as stateful if you rely on trained categories. For production use, define how training data is restored after restart.
+- `/readyz` returns `200` while accepting traffic and returns `503` when the process is draining during shutdown.

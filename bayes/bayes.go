@@ -1,10 +1,11 @@
 package bayes
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 
-	"github.com/hickeroar/gobayes/bayes/category"
+	"github.com/hickeroar/gobayes/v2/bayes/category"
 )
 
 // Classification is the result of classifying a text sample.
@@ -20,6 +21,8 @@ type Classifier struct {
 	Categories category.Categories
 	Tokenizer  func(string) []string
 }
+
+var categoryNamePattern = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
 
 // NewClassifier returns a new Classifier instance.
 func NewClassifier() *Classifier {
@@ -42,45 +45,15 @@ func (c *Classifier) getTokenizer() func(string) []string {
 	return c.Tokenizer
 }
 
-// countTokenOccurances counts token frequencies in a token slice.
-func (c *Classifier) countTokenOccurances(tokens []string) map[string]int {
-	occurances := make(map[string]int)
+// countTokenOccurrences counts token frequencies in a token slice.
+func (c *Classifier) countTokenOccurrences(tokens []string) map[string]int {
+	occurrences := make(map[string]int)
 
 	for _, token := range tokens {
-		occurances[token]++
+		occurrences[token]++
 	}
 
-	return occurances
-}
-
-// calculateCategoryProbabilities updates each category prior probability values.
-func (c *Classifier) calculateCategoryProbabilities() {
-	totalTally := 0.0
-	probabilities := make(map[string]float64)
-
-	// Tallying up the tallies for each category
-	for _, name := range c.Categories.Names() {
-		cat, ok := c.Categories.LookupCategory(name)
-		if !ok {
-			continue
-		}
-		probabilities[name] = float64(cat.GetTally())
-		totalTally += probabilities[name]
-	}
-
-	// Calculating the probability that any given token is in each category
-	for name, count := range probabilities {
-		if totalTally > 0.0 {
-			probabilities[name] = count / totalTally
-		} else {
-			probabilities[name] = 0.0
-		}
-	}
-
-	// Calculating the probability that any given token is NOT in each category, and storing values on the category
-	for name, probability := range probabilities {
-		c.Categories.SetCategoryProbabilities(name, probability, 1.0-probability)
-	}
+	return occurrences
 }
 
 // Flush resets all trained categories.
@@ -90,36 +63,44 @@ func (c *Classifier) Flush() {
 
 // Train updates a category with token counts from a text sample.
 func (c *Classifier) Train(category string, text string) {
+	if !categoryNamePattern.MatchString(category) {
+		return
+	}
+
 	cat := c.Categories.GetCategory(category)
 
 	tokens := c.getTokenizer()(text)
-	occurances := c.countTokenOccurances(tokens)
+	occurrences := c.countTokenOccurrences(tokens)
 
-	for token, count := range occurances {
+	for token, count := range occurrences {
 		if err := cat.TrainToken(token, count); err != nil {
 			continue
 		}
 	}
 
 	c.cleanUpCategory(cat)
-	c.calculateCategoryProbabilities()
+	c.Categories.MarkProbabilitiesDirty()
 }
 
 // Untrain removes token counts from a category using a text sample.
 func (c *Classifier) Untrain(category string, text string) {
+	if !categoryNamePattern.MatchString(category) {
+		return
+	}
+
 	cat := c.Categories.GetCategory(category)
 
 	tokens := c.getTokenizer()(text)
-	occurances := c.countTokenOccurances(tokens)
+	occurrences := c.countTokenOccurrences(tokens)
 
-	for token, count := range occurances {
+	for token, count := range occurrences {
 		if err := cat.UntrainToken(token, count); err != nil {
 			continue
 		}
 	}
 
 	c.cleanUpCategory(cat)
-	c.calculateCategoryProbabilities()
+	c.Categories.MarkProbabilitiesDirty()
 }
 
 // cleanUpCategory removes an empty category.
@@ -161,37 +142,40 @@ func (c *Classifier) Classify(text string) Classification {
 func (c *Classifier) Score(text string) map[string]float64 {
 
 	tokens := c.getTokenizer()(text)
-	occurances := c.countTokenOccurances(tokens)
+	occurrences := c.countTokenOccurrences(tokens)
+	c.Categories.EnsureCategoryProbabilities()
 
 	// Map to hold all scores for all categories
 	scores := make(map[string]float64)
 	categoryNames := c.Categories.Names()
+	categoriesByName := make(map[string]*category.Category, len(categoryNames))
 	for _, key := range categoryNames {
+		cat, ok := c.Categories.LookupCategory(key)
+		if !ok {
+			continue
+		}
+		categoriesByName[key] = cat
 		scores[key] = 0.0
 	}
 
 	// Looping through each string token and calculating its bayesian probability
-	for word, count := range occurances {
+	for word, count := range occurrences {
 		tokenScores := make(map[string]float64)
 		tokenTally := 0.0
 
 		// Getting the tallies of this token from all categories
-		for _, name := range categoryNames {
-			cat, ok := c.Categories.LookupCategory(name)
-			if !ok {
-				continue
-			}
+		for name, cat := range categoriesByName {
 			tokenScores[name] = float64(cat.GetTokenCount(word))
 			tokenTally += tokenScores[name]
 		}
 
-		// If this word had no occurances in any of our categories, we continue
+		// If this word had no occurrences in any of our categories, we continue
 		if tokenTally == 0.0 {
 			continue
 		}
 
 		for name, tokenScore := range tokenScores {
-			cat, ok := c.Categories.LookupCategory(name)
+			cat, ok := categoriesByName[name]
 			if !ok {
 				continue
 			}

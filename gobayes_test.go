@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hickeroar/gobayes/bayes"
+	"github.com/hickeroar/gobayes/v2/bayes"
 )
 
 func assertJSONContentType(t *testing.T, rr *httptest.ResponseRecorder) {
@@ -36,6 +36,7 @@ func newTestServer() (*ClassifierAPI, *http.ServeMux) {
 	api := &ClassifierAPI{
 		classifier: *bayes.NewClassifier(),
 	}
+	api.ready.Store(true)
 	mux := http.NewServeMux()
 	api.RegisterRoutes(mux)
 	return api, mux
@@ -133,7 +134,8 @@ func TestOversizedBodyRejected(t *testing.T) {
 }
 
 func TestHealthAndReadyEndpoints(t *testing.T) {
-	_, mux := newTestServer()
+	api, mux := newTestServer()
+	api.ready.Store(true)
 
 	for _, path := range []string{"/healthz", "/readyz"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -144,6 +146,20 @@ func TestHealthAndReadyEndpoints(t *testing.T) {
 		}
 		assertJSONContentType(t, rr)
 	}
+}
+
+func TestReadyEndpointNotReady(t *testing.T) {
+	api, mux := newTestServer()
+	api.ready.Store(false)
+
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unexpected status for /readyz: got %d, want %d", rr.Code, http.StatusServiceUnavailable)
+	}
+	assertJSONContentType(t, rr)
 }
 
 func TestConcurrentRequests(t *testing.T) {

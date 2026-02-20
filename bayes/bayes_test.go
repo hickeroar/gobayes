@@ -83,6 +83,31 @@ func TestClassifyTieBreaksDeterministically(t *testing.T) {
 	}
 }
 
+func TestTrainIgnoresInvalidCategoryNames(t *testing.T) {
+	classifier := NewClassifier()
+	classifier.Train("", "hello world")
+	classifier.Train("spam!", "hello world")
+
+	if len(classifier.Categories.Names()) != 0 {
+		t.Fatalf("expected no categories for invalid names, got %v", classifier.Categories.Names())
+	}
+}
+
+func TestUntrainIgnoresInvalidCategoryNames(t *testing.T) {
+	classifier := NewClassifier()
+	classifier.Train("spam", "buy now")
+	classifier.Untrain("", "buy now")
+	classifier.Untrain("spam!", "buy now")
+
+	cat, ok := classifier.Categories.LookupCategory("spam")
+	if !ok {
+		t.Fatal("expected spam category to remain")
+	}
+	if got := cat.GetTally(); got != 2 {
+		t.Fatalf("expected spam tally unchanged, got %d", got)
+	}
+}
+
 func FuzzClassifierInvariants(f *testing.F) {
 	f.Add("spam", "buy now buy now")
 	f.Add("ham", "hello world")

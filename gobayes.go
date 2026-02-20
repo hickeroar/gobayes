@@ -13,10 +13,11 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
-	"github.com/hickeroar/gobayes/bayes"
+	"github.com/hickeroar/gobayes/v2/bayes"
 )
 
 const maxRequestBodyBytes = 1 << 20 // 1 MiB
@@ -27,6 +28,7 @@ var categoryPathPattern = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
 type ClassifierAPI struct {
 	classifier bayes.Classifier
 	mu         sync.RWMutex
+	ready      atomic.Bool
 }
 
 // RegisterRoutes registers all API routes on the provided ServeMux.
@@ -38,7 +40,7 @@ func (c *ClassifierAPI) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/score", c.ScoreHandler)
 	mux.HandleFunc("/flush", c.FlushHandler)
 	mux.HandleFunc("/healthz", HealthHandler)
-	mux.HandleFunc("/readyz", ReadyHandler)
+	mux.HandleFunc("/readyz", c.ReadyHandler)
 }
 
 func writeJSON(w http.ResponseWriter, status int, value interface{}) {
@@ -221,8 +223,12 @@ func HealthHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // ReadyHandler returns readiness status for traffic checks.
-func ReadyHandler(w http.ResponseWriter, req *http.Request) {
+func (c *ClassifierAPI) ReadyHandler(w http.ResponseWriter, req *http.Request) {
 	if !requireMethod(w, req, http.MethodGet) {
+		return
+	}
+	if !c.ready.Load() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not ready"})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
@@ -233,6 +239,7 @@ func main() {
 
 	controller := new(ClassifierAPI)
 	controller.classifier = *bayes.NewClassifier()
+	controller.ready.Store(true)
 	controller.RegisterRoutes(mux)
 
 	port := flag.String("port", "8000", "The port the server should listen on.")
@@ -258,6 +265,7 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
+	controller.ready.Store(false)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
