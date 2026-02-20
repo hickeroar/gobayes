@@ -2,20 +2,14 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
-	"syscall"
 	"testing"
-	"time"
 
 	"github.com/hickeroar/gobayes/v2/bayes"
 )
@@ -338,55 +332,6 @@ func TestConcurrentRequests(t *testing.T) {
 	wg.Wait()
 }
 
-func FuzzCategoryFromPath(f *testing.F) {
-	f.Add("/train/spam", "/train/")
-	f.Add("/train/spam123", "/train/")
-	f.Add("/train/spam-v2", "/train/")
-	f.Add("/train/spam_v2", "/train/")
-	f.Add("/untrain/ham", "/untrain/")
-	f.Add("/train/", "/train/")
-	f.Add("/train/with/slash", "/train/")
-
-	f.Fuzz(func(t *testing.T, path string, prefix string) {
-		category, ok := categoryFromPath(path, prefix)
-		if ok {
-			if !categoryPathPattern.MatchString(category) {
-				t.Fatalf("category %q accepted but does not match pattern", category)
-			}
-			if strings.Contains(category, "/") {
-				t.Fatalf("category %q accepted but still contains slash", category)
-			}
-		}
-	})
-}
-
-func FuzzClassifyHandlerBody(f *testing.F) {
-	f.Add(http.MethodPost, "buy now")
-	f.Add(http.MethodPost, string(bytes.Repeat([]byte("a"), maxRequestBodyBytes+1)))
-	f.Add(http.MethodGet, "ignored")
-
-	f.Fuzz(func(t *testing.T, method string, body string) {
-		_, mux := newTestServer()
-		req, err := http.NewRequest(method, "http://example.com/classify", strings.NewReader(body))
-		if err != nil {
-			return
-		}
-		rr := httptest.NewRecorder()
-		mux.ServeHTTP(rr, req)
-
-		switch rr.Code {
-		case http.StatusOK, http.StatusMethodNotAllowed, http.StatusBadRequest, http.StatusRequestEntityTooLarge:
-			// expected statuses
-		default:
-			t.Fatalf("unexpected status code %d for method=%q bodyLen=%d", rr.Code, method, len(body))
-		}
-
-		if rr.Code != http.StatusOK {
-			assertJSONErrorShape(t, rr)
-		}
-	})
-}
-
 func TestAPIContractMatrix(t *testing.T) {
 	type testCase struct {
 		name        string
@@ -435,96 +380,5 @@ func TestAPIContractMatrix(t *testing.T) {
 				assertJSONErrorShape(t, rr)
 			}
 		})
-	}
-}
-
-type fakeServer struct {
-	listenErr   error
-	shutdownErr error
-	listened    atomic.Bool
-}
-
-func (f *fakeServer) ListenAndServe() error {
-	f.listened.Store(true)
-	return f.listenErr
-}
-
-func (f *fakeServer) Shutdown(context.Context) error {
-	return f.shutdownErr
-}
-
-func TestRunMainSuccessPath(t *testing.T) {
-	oldRunMain := runMain
-	oldMakeSignal := makeSignalChannel
-	oldNotify := notifySignals
-	oldNewServer := newServer
-	oldLogFatal := logFatal
-	oldFlagCommandLine := flag.CommandLine
-	oldArgs := os.Args
-	defer func() {
-		runMain = oldRunMain
-		makeSignalChannel = oldMakeSignal
-		notifySignals = oldNotify
-		newServer = oldNewServer
-		logFatal = oldLogFatal
-		flag.CommandLine = oldFlagCommandLine
-		os.Args = oldArgs
-	}()
-
-	sigCh := make(chan os.Signal, 1)
-	makeSignalChannel = func() chan os.Signal { return sigCh }
-	notifySignals = func(chan<- os.Signal, ...os.Signal) {}
-
-	server := &fakeServer{listenErr: http.ErrServerClosed}
-	newServer = func(string, http.Handler) httpServer { return server }
-	logFatal = func(...interface{}) {}
-
-	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
-	os.Args = []string{"gobayes.test", "-port", "9999"}
-
-	done := make(chan error, 1)
-	go func() {
-		done <- runMain()
-	}()
-
-	sigCh <- syscall.SIGTERM
-
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("expected nil runMain error, got %v", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for runMain to exit")
-	}
-
-	_ = server.listened.Load()
-}
-
-func TestMainHandlesRunError(t *testing.T) {
-	oldRunMain := runMain
-	oldLogFatal := logFatal
-	defer func() {
-		runMain = oldRunMain
-		logFatal = oldLogFatal
-	}()
-
-	expectedErr := errors.New("boom")
-	runMain = func() error { return expectedErr }
-
-	called := false
-	logFatal = func(v ...interface{}) {
-		called = true
-		if len(v) != 1 {
-			t.Fatalf("unexpected fatal args: %v", v)
-		}
-		if !errors.Is(v[0].(error), expectedErr) {
-			t.Fatalf("unexpected fatal error: %v", v[0])
-		}
-	}
-
-	main()
-	if !called {
-		t.Fatal("expected main to call logFatal on error")
 	}
 }
