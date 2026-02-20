@@ -33,7 +33,7 @@ jobs:
 
       - name: Enforce minimum coverage
         run: |
-          MIN_COVERAGE=60.0
+          MIN_COVERAGE=100.0
           COVERAGE=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
           echo "Total coverage: ${COVERAGE}% (minimum ${MIN_COVERAGE}%)"
           awk -v c="$COVERAGE" -v min="$MIN_COVERAGE" 'BEGIN { exit (c+0 >= min+0) ? 0 : 1 }'

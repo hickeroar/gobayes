@@ -24,6 +24,57 @@ const maxRequestBodyBytes = 1 << 20 // 1 MiB
 
 var categoryPathPattern = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
 
+type httpServer interface {
+	ListenAndServe() error
+	Shutdown(ctx context.Context) error
+}
+
+var (
+	makeSignalChannel = func() chan os.Signal { return make(chan os.Signal, 1) }
+	notifySignals     = func(c chan<- os.Signal, sig ...os.Signal) { signal.Notify(c, sig...) }
+	newServer         = func(addr string, handler http.Handler) httpServer {
+		return &http.Server{
+			Addr:              addr,
+			Handler:           handler,
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      10 * time.Second,
+			IdleTimeout:       30 * time.Second,
+		}
+	}
+	logFatal = func(v ...interface{}) { log.Fatal(v...) }
+	runMain  = func() error {
+		mux := http.NewServeMux()
+
+		controller := new(ClassifierAPI)
+		controller.classifier = *bayes.NewClassifier()
+		controller.ready.Store(true)
+		controller.RegisterRoutes(mux)
+
+		port := flag.String("port", "8000", "The port the server should listen on.")
+		flag.Parse()
+
+		server := newServer(":"+*port, mux)
+		log.Printf("Server is listening on port %s.", *port)
+
+		go func() {
+			if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logFatal(err)
+			}
+		}()
+
+		sigCh := makeSignalChannel()
+		notifySignals(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		<-sigCh
+		controller.ready.Store(false)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		return server.Shutdown(ctx)
+	}
+)
+
 // ClassifierAPI serves classifier HTTP endpoints and shared classifier state.
 type ClassifierAPI struct {
 	classifier bayes.Classifier
@@ -235,42 +286,7 @@ func (c *ClassifierAPI) ReadyHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	mux := http.NewServeMux()
-
-	controller := new(ClassifierAPI)
-	controller.classifier = *bayes.NewClassifier()
-	controller.ready.Store(true)
-	controller.RegisterRoutes(mux)
-
-	port := flag.String("port", "8000", "The port the server should listen on.")
-	flag.Parse()
-
-	server := &http.Server{
-		Addr:              ":" + *port,
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       30 * time.Second,
-	}
-
-	log.Printf("Server is listening on port %s.", *port)
-
-	go func() {
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal(err)
-		}
-	}()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
-	controller.ready.Store(false)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatal(err)
+	if err := runMain(); err != nil {
+		logFatal(err)
 	}
 }

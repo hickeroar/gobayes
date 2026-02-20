@@ -14,6 +14,12 @@ type Category struct {
 	probInCat    float64        // Probability that an arbitrary token is in this category
 }
 
+// PersistedCategory is a serializable representation of Category data.
+type PersistedCategory struct {
+	Tokens map[string]int
+	Tally  int
+}
+
 // NewCategory returns a new Category with initialized token storage.
 func NewCategory(name string) *Category {
 	return &Category{
@@ -89,4 +95,16 @@ func (cat Category) GetProbNotInCat() float64 {
 func (cat *Category) setProbabilities(probInCat float64, probNotInCat float64) {
 	cat.probInCat = probInCat
 	cat.probNotInCat = probNotInCat
+}
+
+func (cat *Category) exportState() PersistedCategory {
+	tokens := make(map[string]int, len(cat.tokens))
+	for token, count := range cat.tokens {
+		tokens[token] = count
+	}
+
+	return PersistedCategory{
+		Tokens: tokens,
+		Tally:  cat.tally,
+	}
 }

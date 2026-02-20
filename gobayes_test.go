@@ -2,12 +2,20 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
+	"flag"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/hickeroar/gobayes/v2/bayes"
 )
@@ -116,6 +124,140 @@ func TestInvalidCategoryRoute(t *testing.T) {
 
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("unexpected status: got %d, want %d", rr.Code, http.StatusNotFound)
+	}
+}
+
+func TestTrainAndUntrainHandlers(t *testing.T) {
+	_, mux := newTestServer()
+
+	trainReq := httptest.NewRequest(http.MethodPost, "/train/spam", strings.NewReader("buy now now"))
+	trainRR := httptest.NewRecorder()
+	mux.ServeHTTP(trainRR, trainReq)
+	if trainRR.Code != http.StatusOK {
+		t.Fatalf("unexpected train status: got %d, want %d", trainRR.Code, http.StatusOK)
+	}
+
+	untrainReq := httptest.NewRequest(http.MethodPost, "/untrain/spam", strings.NewReader("buy"))
+	untrainRR := httptest.NewRecorder()
+	mux.ServeHTTP(untrainRR, untrainReq)
+	if untrainRR.Code != http.StatusOK {
+		t.Fatalf("unexpected untrain status: got %d, want %d", untrainRR.Code, http.StatusOK)
+	}
+}
+
+func TestUntrainInvalidCategoryRoute(t *testing.T) {
+	_, mux := newTestServer()
+	req := httptest.NewRequest(http.MethodPost, "/untrain/spam!", strings.NewReader("text"))
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("unexpected status: got %d, want %d", rr.Code, http.StatusNotFound)
+	}
+	assertJSONErrorShape(t, rr)
+}
+
+func TestScoreHandlerBadBody(t *testing.T) {
+	_, mux := newTestServer()
+	req := httptest.NewRequest(http.MethodPost, "/score", nil)
+	req.Body = io.NopCloser(errReader{})
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("unexpected status: got %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+	assertJSONErrorShape(t, rr)
+}
+
+func TestTrainHandlerBadBody(t *testing.T) {
+	_, mux := newTestServer()
+	req := httptest.NewRequest(http.MethodPost, "/train/spam", nil)
+	req.Body = io.NopCloser(errReader{})
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("unexpected status: got %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+	assertJSONErrorShape(t, rr)
+}
+
+func TestUntrainHandlerBadBody(t *testing.T) {
+	_, mux := newTestServer()
+	req := httptest.NewRequest(http.MethodPost, "/untrain/spam", nil)
+	req.Body = io.NopCloser(errReader{})
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("unexpected status: got %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+	assertJSONErrorShape(t, rr)
+}
+
+func TestTrainHandlerMethodNotAllowed(t *testing.T) {
+	_, mux := newTestServer()
+	req := httptest.NewRequest(http.MethodGet, "/train/spam", nil)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("unexpected status: got %d, want %d", rr.Code, http.StatusMethodNotAllowed)
+	}
+	assertJSONErrorShape(t, rr)
+}
+
+func TestHealthHandlerMethodNotAllowed(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/healthz", nil)
+	rr := httptest.NewRecorder()
+	HealthHandler(rr, req)
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("unexpected status: got %d, want %d", rr.Code, http.StatusMethodNotAllowed)
+	}
+	assertJSONErrorShape(t, rr)
+}
+
+func TestReadyHandlerMethodNotAllowed(t *testing.T) {
+	api, _ := newTestServer()
+	req := httptest.NewRequest(http.MethodPost, "/readyz", nil)
+	rr := httptest.NewRecorder()
+	api.ReadyHandler(rr, req)
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("unexpected status: got %d, want %d", rr.Code, http.StatusMethodNotAllowed)
+	}
+	assertJSONErrorShape(t, rr)
+}
+
+type errReader struct{}
+
+func (errReader) Read([]byte) (int, error) {
+	return 0, errors.New("read failed")
+}
+
+type failWriteRecorder struct {
+	header http.Header
+	status int
+}
+
+func (f *failWriteRecorder) Header() http.Header {
+	return f.header
+}
+
+func (f *failWriteRecorder) WriteHeader(statusCode int) {
+	f.status = statusCode
+}
+
+func (f *failWriteRecorder) Write([]byte) (int, error) {
+	return 0, errors.New("write failed")
+}
+
+func TestWriteJSONMarshalAndWriteErrors(t *testing.T) {
+	rr := httptest.NewRecorder()
+	writeJSON(rr, http.StatusOK, map[string]interface{}{"bad": func() {}})
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected internal server error for marshal failure, got %d", rr.Code)
+	}
+
+	failing := &failWriteRecorder{header: make(http.Header)}
+	writeJSON(failing, http.StatusOK, map[string]string{"ok": "ok"})
+	if failing.status != http.StatusOK {
+		t.Fatalf("expected status to be set before write failure, got %d", failing.status)
 	}
 }
 
@@ -293,5 +435,96 @@ func TestAPIContractMatrix(t *testing.T) {
 				assertJSONErrorShape(t, rr)
 			}
 		})
+	}
+}
+
+type fakeServer struct {
+	listenErr   error
+	shutdownErr error
+	listened    atomic.Bool
+}
+
+func (f *fakeServer) ListenAndServe() error {
+	f.listened.Store(true)
+	return f.listenErr
+}
+
+func (f *fakeServer) Shutdown(context.Context) error {
+	return f.shutdownErr
+}
+
+func TestRunMainSuccessPath(t *testing.T) {
+	oldRunMain := runMain
+	oldMakeSignal := makeSignalChannel
+	oldNotify := notifySignals
+	oldNewServer := newServer
+	oldLogFatal := logFatal
+	oldFlagCommandLine := flag.CommandLine
+	oldArgs := os.Args
+	defer func() {
+		runMain = oldRunMain
+		makeSignalChannel = oldMakeSignal
+		notifySignals = oldNotify
+		newServer = oldNewServer
+		logFatal = oldLogFatal
+		flag.CommandLine = oldFlagCommandLine
+		os.Args = oldArgs
+	}()
+
+	sigCh := make(chan os.Signal, 1)
+	makeSignalChannel = func() chan os.Signal { return sigCh }
+	notifySignals = func(chan<- os.Signal, ...os.Signal) {}
+
+	server := &fakeServer{listenErr: http.ErrServerClosed}
+	newServer = func(string, http.Handler) httpServer { return server }
+	logFatal = func(...interface{}) {}
+
+	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	os.Args = []string{"gobayes.test", "-port", "9999"}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- runMain()
+	}()
+
+	sigCh <- syscall.SIGTERM
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("expected nil runMain error, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for runMain to exit")
+	}
+
+	_ = server.listened.Load()
+}
+
+func TestMainHandlesRunError(t *testing.T) {
+	oldRunMain := runMain
+	oldLogFatal := logFatal
+	defer func() {
+		runMain = oldRunMain
+		logFatal = oldLogFatal
+	}()
+
+	expectedErr := errors.New("boom")
+	runMain = func() error { return expectedErr }
+
+	called := false
+	logFatal = func(v ...interface{}) {
+		called = true
+		if len(v) != 1 {
+			t.Fatalf("unexpected fatal args: %v", v)
+		}
+		if !errors.Is(v[0].(error), expectedErr) {
+			t.Fatalf("unexpected fatal error: %v", v[0])
+		}
+	}
+
+	main()
+	if !called {
+		t.Fatal("expected main to call logFatal on error")
 	}
 }

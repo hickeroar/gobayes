@@ -1,5 +1,5 @@
 # GoBayes
-A Go package and web API for memory-based naive Bayesian text classification.
+A memory-based, optional-persistence naive Bayesian text classification package and web API for Go.
 
 ---
 
@@ -61,37 +61,69 @@ Import the library package:
 import "github.com/hickeroar/gobayes/v2/bayes"
 ```
 
-Basic example:
+Library example (train, classify, score, untrain, persist, restore):
 ```go
 package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/hickeroar/gobayes/v2/bayes"
 )
 
 func main() {
+	// Create a new in-memory classifier instance.
 	classifier := bayes.NewClassifier()
 
+	// Train categories with representative text samples.
 	classifier.Train("spam", "buy now limited offer click here")
 	classifier.Train("ham", "team meeting schedule for tomorrow")
 
+	// Classify a sample and inspect the top category + score.
 	classification := classifier.Classify("limited offer today")
 	fmt.Printf("category=%s score=%f\n", classification.Category, classification.Score)
 
+	// Get per-category relative scores for another sample.
 	scores := classifier.Score("team schedule update")
 	fmt.Printf("scores=%v\n", scores)
 
+	// Optionally remove previously trained text.
 	classifier.Untrain("spam", "buy now limited offer click here")
+
+	// Persist trained model state to a gob file.
+	// Passing an empty path uses the default: /tmp/gobayes.gob.
+	if err := classifier.SaveToFile("/tmp/model.gob"); err != nil {
+		log.Fatalf("save failed: %v", err)
+	}
+
+	// Load persisted state into a fresh classifier instance.
+	// Passing an empty path uses the default: /tmp/gobayes.gob.
+	loaded := bayes.NewClassifier()
+	if err := loaded.LoadFromFile("/tmp/model.gob"); err != nil {
+		log.Fatalf("load failed: %v", err)
+	}
+
+	// Reuse the loaded model for classification.
+	_ = loaded.Classify("limited offer today")
 }
 ```
 
 Notes for library usage:
-- `Classifier` is not goroutine-safe by itself; guard shared instances with your own synchronization.
-- State is in memory only; restart/recreate means retraining unless you persist training data externally.
+- `Classifier` methods are goroutine-safe.
+- Gobayes is memory-based with optional persistence when used as a library (`Save`/`Load`, `SaveToFile`/`LoadFromFile`).
+- Persisted model data includes category/token tallies only; tokenizer configuration is runtime behavior and is not persisted.
 - Scores are relative values and should be compared within the same model, not treated as calibrated probabilities.
 - Category names accepted by `Train`/`Untrain` match `^[-_A-Za-z0-9]+$`; invalid names are ignored.
+- Direct mutation of exported internals (for example `Classifier.Categories`) can bypass method-level synchronization.
+
+For non-file workflows, you can use stream APIs:
+- `Save(io.Writer) error`
+- `Load(io.Reader) error`
+
+File helper note:
+- `SaveToFile` and `LoadFromFile` use `/tmp/gobayes.gob` when path is empty.
+- When a path is provided, it must be absolute.
 
 ## Development Checks
 ```
@@ -283,6 +315,7 @@ Accepts: GET
 ```
 
 ## Operational Notes
-- Training data is in memory only. Process restarts and deploy rollouts wipe model state unless your app replays training events.
+- The HTTP server stores training data in memory only. Process restarts and deploy rollouts wipe model state unless your app replays training events.
+- When using Gobayes as a library, model state can be persisted and restored with `Save`/`Load` or `SaveToFile`/`LoadFromFile`.
 - Treat Gobayes as stateful if you rely on trained categories. For production use, define how training data is restored after restart.
 - `/readyz` returns `200` while accepting traffic and returns `503` when the process is draining during shutdown.

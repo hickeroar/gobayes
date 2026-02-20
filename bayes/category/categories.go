@@ -1,5 +1,7 @@
 package category
 
+import "fmt"
+
 // CategorySummary is a read-only summary used by API responses.
 type CategorySummary struct {
 	TokenTally   int
@@ -113,4 +115,40 @@ func (cats *Categories) Summaries() map[string]CategorySummary {
 		}
 	}
 	return snapshot
+}
+
+// ExportStates returns a deep-copy snapshot of all categories for persistence.
+func (cats *Categories) ExportStates() map[string]PersistedCategory {
+	states := make(map[string]PersistedCategory, len(cats.categories))
+	for name, cat := range cats.categories {
+		states[name] = cat.exportState()
+	}
+	return states
+}
+
+// ReplaceStates replaces all categories from a persisted state snapshot.
+func (cats *Categories) ReplaceStates(states map[string]PersistedCategory) error {
+	next := make(map[string]*Category, len(states))
+
+	for name, state := range states {
+		cat := NewCategory(name)
+		sum := 0
+		for token, count := range state.Tokens {
+			if count <= 0 {
+				return fmt.Errorf("invalid token count for %q token %q: %d", name, token, count)
+			}
+			cat.tokens[token] = count
+			sum += count
+		}
+
+		if sum != state.Tally {
+			return fmt.Errorf("invalid tally for %q: tally=%d sum=%d", name, state.Tally, sum)
+		}
+		cat.tally = state.Tally
+		next[name] = cat
+	}
+
+	cats.categories = next
+	cats.probabilitiesDirty = true
+	return nil
 }
