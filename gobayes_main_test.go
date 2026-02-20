@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"sync/atomic"
 	"syscall"
@@ -50,11 +51,15 @@ func TestRunMainSuccessPath(t *testing.T) {
 	notifySignals = func(chan<- os.Signal, ...os.Signal) {}
 
 	server := &fakeServer{listenErr: http.ErrServerClosed}
-	newServer = func(string, http.Handler) httpServer { return server }
+	var capturedHandler http.Handler
+	newServer = func(_ string, handler http.Handler) httpServer {
+		capturedHandler = handler
+		return server
+	}
 	logFatal = func(...interface{}) {}
 
 	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
-	os.Args = []string{"gobayes.test", "-port", "9999"}
+	os.Args = []string{"gobayes.test", "--port", "9999", "--auth-token", "secret-token"}
 
 	done := make(chan error, 1)
 	go func() {
@@ -73,6 +78,17 @@ func TestRunMainSuccessPath(t *testing.T) {
 	}
 
 	_ = server.listened.Load()
+
+	if capturedHandler == nil {
+		t.Fatal("expected handler to be provided to server")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/info", nil)
+	rr := httptest.NewRecorder()
+	capturedHandler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected protected endpoint to require auth token, got status %d", rr.Code)
+	}
 }
 
 func TestMainHandlesRunError(t *testing.T) {
