@@ -133,6 +133,23 @@ func TestReplaceStatesRejectsInvalidTokenCount(t *testing.T) {
 	}
 }
 
+func TestEnsureCategoryProbabilitiesNoOpWhenClean(t *testing.T) {
+	cats := NewCategories()
+	spam := cats.GetCategory("spam")
+	if err := spam.TrainToken("buy", 2); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
+	cats.EnsureCategoryProbabilities()
+	before := cats.Summaries()["spam"].ProbInCat
+
+	cats.EnsureCategoryProbabilities()
+	after := cats.Summaries()["spam"].ProbInCat
+
+	if before != after {
+		t.Fatal("expected probabilities unchanged when clean")
+	}
+}
+
 func TestMarkProbabilitiesDirtyForcesRecalc(t *testing.T) {
 	cats := NewCategories()
 	spam := cats.GetCategory("spam")

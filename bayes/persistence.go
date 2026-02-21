@@ -48,7 +48,7 @@ func (c *Classifier) Save(w io.Writer) error {
 	c.mu.RLock()
 	state := modelState{
 		Version:    persistedModelVersion,
-		Categories: c.Categories.ExportStates(),
+		Categories: c.categories.ExportStates(),
 	}
 	c.mu.RUnlock()
 
@@ -76,10 +76,10 @@ func (c *Classifier) Load(r io.Reader) error {
 
 	cats := category.NewCategories()
 	_ = cats.ReplaceStates(state.Categories)
-	cats.MarkProbabilitiesDirty()
+	cats.EnsureCategoryProbabilities()
 
 	c.mu.Lock()
-	c.Categories = *cats
+	c.categories = *cats
 	c.mu.Unlock()
 
 	return nil

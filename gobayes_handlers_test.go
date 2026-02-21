@@ -36,7 +36,7 @@ func assertJSONErrorShape(t *testing.T, rr *httptest.ResponseRecorder) {
 
 func newTestServer() (*ClassifierAPI, *http.ServeMux) {
 	api := &ClassifierAPI{
-		classifier: *bayes.NewClassifier(),
+		classifier: bayes.NewClassifier(),
 	}
 	api.ready.Store(true)
 	mux := http.NewServeMux()

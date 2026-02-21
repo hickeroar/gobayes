@@ -17,7 +17,7 @@ type Classification struct {
 
 // Classifier trains text categories and classifies new text samples.
 type Classifier struct {
-	Categories category.Categories
+	categories category.Categories
 	Tokenizer  func(string) []string
 	mu         sync.RWMutex
 }
@@ -27,7 +27,7 @@ var categoryNamePattern = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
 // NewClassifier returns a new Classifier instance.
 func NewClassifier() *Classifier {
 	return &Classifier{
-		Categories: *category.NewCategories(),
+		categories: *category.NewCategories(),
 	}
 }
 
@@ -61,7 +61,8 @@ func (c *Classifier) Flush() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.Categories = *category.NewCategories()
+	c.categories = *category.NewCategories()
+	c.categories.EnsureCategoryProbabilities()
 }
 
 // Train updates a category with token counts from a text sample.
@@ -73,7 +74,7 @@ func (c *Classifier) Train(category string, text string) {
 		return
 	}
 
-	cat := c.Categories.GetCategory(category)
+	cat := c.categories.GetCategory(category)
 
 	tokens := c.getTokenizer()(text)
 	occurrences := c.countTokenOccurrences(tokens)
@@ -83,7 +84,7 @@ func (c *Classifier) Train(category string, text string) {
 	}
 
 	c.cleanUpCategory(cat)
-	c.Categories.MarkProbabilitiesDirty()
+	c.categories.EnsureCategoryProbabilities()
 }
 
 // Untrain removes token counts from a category using a text sample.
@@ -95,7 +96,7 @@ func (c *Classifier) Untrain(category string, text string) {
 		return
 	}
 
-	cat := c.Categories.GetCategory(category)
+	cat := c.categories.GetCategory(category)
 
 	tokens := c.getTokenizer()(text)
 	occurrences := c.countTokenOccurrences(tokens)
@@ -105,21 +106,20 @@ func (c *Classifier) Untrain(category string, text string) {
 	}
 
 	c.cleanUpCategory(cat)
-	c.Categories.MarkProbabilitiesDirty()
+	c.categories.EnsureCategoryProbabilities()
 }
 
 // cleanUpCategory removes an empty category.
 func (c *Classifier) cleanUpCategory(cat *category.Category) {
-	// If there are no tokens in this category, we delete the category.
 	if cat.GetTally() == 0 {
-		c.Categories.DeleteCategory(cat.Name())
+		c.categories.DeleteCategory(cat.Name())
 	}
 }
 
 // Classify scores text against all categories and returns the best match.
 func (c *Classifier) Classify(text string) Classification {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	scores := c.scoreUnlocked(text)
 	result := Classification{}
@@ -148,23 +148,28 @@ func (c *Classifier) Classify(text string) Classification {
 
 // Score computes Bayesian scores for each category given a text sample.
 func (c *Classifier) Score(text string) map[string]float64 {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	return c.scoreUnlocked(text)
+}
+
+// Summaries returns a response-oriented snapshot of all category data.
+func (c *Classifier) Summaries() map[string]category.CategorySummary {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.categories.Summaries()
 }
 
 func (c *Classifier) scoreUnlocked(text string) map[string]float64 {
 	tokens := c.getTokenizer()(text)
 	occurrences := c.countTokenOccurrences(tokens)
-	c.Categories.EnsureCategoryProbabilities()
 
-	// Map to hold all scores for all categories
 	scores := make(map[string]float64)
-	categoryNames := c.Categories.Names()
+	categoryNames := c.categories.Names()
 	categoriesByName := make(map[string]*category.Category, len(categoryNames))
 	for _, key := range categoryNames {
-		cat, _ := c.Categories.LookupCategory(key)
+		cat, _ := c.categories.LookupCategory(key)
 		categoriesByName[key] = cat
 		scores[key] = 0.0
 	}
