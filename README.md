@@ -33,7 +33,7 @@ $ go build ./...
 
 If you only want to use Gobayes as a library in your own app, add it as a dependency:
 ```
-$ go get github.com/hickeroar/gobayes/v2
+$ go get github.com/hickeroar/gobayes/v3
 ```
 
 ---
@@ -72,7 +72,7 @@ Note: both single-hyphen and double-hyphen forms are accepted for flags, but exa
 
 Import the library package:
 ```go
-import "github.com/hickeroar/gobayes/v2/bayes"
+import "github.com/hickeroar/gobayes/v3/bayes"
 ```
 
 Library example (train, classify, score, untrain, persist, restore):
@@ -83,7 +83,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/hickeroar/gobayes/v2/bayes"
+	"github.com/hickeroar/gobayes/v3/bayes"
 )
 
 func main() {
@@ -91,8 +91,12 @@ func main() {
 	classifier := bayes.NewClassifier()
 
 	// Train categories with representative text samples.
-	classifier.Train("spam", "buy now limited offer click here")
-	classifier.Train("ham", "team meeting schedule for tomorrow")
+	if err := classifier.Train("spam", "buy now limited offer click here"); err != nil {
+		log.Fatalf("train spam failed: %v", err)
+	}
+	if err := classifier.Train("ham", "team meeting schedule for tomorrow"); err != nil {
+		log.Fatalf("train ham failed: %v", err)
+	}
 
 	// Classify a sample and inspect the top category + score.
 	classification := classifier.Classify("limited offer today")
@@ -103,7 +107,9 @@ func main() {
 	fmt.Printf("scores=%v\n", scores)
 
 	// Optionally remove previously trained text.
-	classifier.Untrain("spam", "buy now limited offer click here")
+	if err := classifier.Untrain("spam", "buy now limited offer click here"); err != nil {
+		log.Fatalf("untrain spam failed: %v", err)
+	}
 
 	// Persist trained model state to a gob file.
 	// Passing an empty path uses the default: /tmp/gobayes.gob.
@@ -127,9 +133,9 @@ Notes for library usage:
 - `Classifier` methods are goroutine-safe.
 - Gobayes is memory-based with optional persistence when used as a library (`Save`/`Load`, `SaveToFile`/`LoadFromFile`).
 - Persisted model data includes category/token tallies only; tokenizer configuration is runtime behavior and is not persisted.
+- Default tokenization applies Unicode normalization, punctuation splitting, and English stemming before scoring.
 - Scores are relative values and should be compared within the same model, not treated as calibrated probabilities.
-- Category names accepted by `Train`/`Untrain` match `^[-_A-Za-z0-9]+$`; invalid names are ignored.
-- Direct mutation of exported internals (for example `Classifier.Categories`) can bypass method-level synchronization.
+- Category names accepted by `Train`/`Untrain` match `^[-_A-Za-z0-9]+$`; invalid names return an error.
 
 For non-file workflows, you can use stream APIs:
 - `Save(io.Writer) error`
@@ -177,17 +183,17 @@ category including the total text tokens that category contains, and the probabi
 any given token existing in that category vs other categories.
 ```
 {
-    "Success": true,
-    "Categories": {
+    "success": true,
+    "categories": {
         "ham": {
-            "TokenTally": 1864,
-            "ProbNotInCat": 0.540093757710338,
-            "ProbInCat": 0.459906242289662
+            "tokenTally": 1864,
+            "probNotInCat": 0.540093757710338,
+            "probInCat": 0.459906242289662
         },
         "spam": {
-            "TokenTally": 2189,
-            "ProbNotInCat": 0.4599062422896619,
-            "ProbInCat": 0.5400937577103381
+            "tokenTally": 2189,
+            "probNotInCat": 0.4599062422896619,
+            "probInCat": 0.5400937577103381
         }
     }
 }
@@ -209,17 +215,17 @@ category including the total text tokens that category contains, and the probabi
 any given token existing in that category vs other categories.
 ```
 {
-    "Success": true,
-    "Categories": {
+    "success": true,
+    "categories": {
         "ham": {
-            "TokenTally": 1864,
-            "ProbNotInCat": 0.540093757710338,
-            "ProbInCat": 0.459906242289662
+            "tokenTally": 1864,
+            "probNotInCat": 0.540093757710338,
+            "probInCat": 0.459906242289662
         },
         "spam": {
-            "TokenTally": 2189,
-            "ProbNotInCat": 0.4599062422896619,
-            "ProbInCat": 0.5400937577103381
+            "tokenTally": 2189,
+            "probNotInCat": 0.4599062422896619,
+            "probInCat": 0.5400937577103381
         }
     }
 }
@@ -240,16 +246,16 @@ category including the total text tokens that category contains, and the probabi
 any given token existing in that category vs other categories.
 ```
 {
-    "Categories": {
+    "categories": {
         "ham": {
-            "TokenTally": 1864,
-            "ProbNotInCat": 0.540093757710338,
-            "ProbInCat": 0.459906242289662
+            "tokenTally": 1864,
+            "probNotInCat": 0.540093757710338,
+            "probInCat": 0.459906242289662
         },
         "spam": {
-            "TokenTally": 2189,
-            "ProbNotInCat": 0.4599062422896619,
-            "ProbInCat": 0.5400937577103381
+            "tokenTally": 2189,
+            "probNotInCat": 0.4599062422896619,
+            "probInCat": 0.5400937577103381
         }
     }
 }
@@ -265,14 +271,14 @@ any given token existing in that category vs other categories.
 Accepts: POST
 ```
 The result is of content-type "application/json" and contains a simple object
-showing the Category classification and the classification Score that was calculated.
-The Score should not be relied on as any kind of specific indicator, as it's a
+showing the category classification and the classification score that was calculated.
+The score should not be relied on as any kind of specific indicator, as it's a
 relative score and varies based on the number of tokens your categories have been
 trained with.
 ```
 {
-    "Category": "spam",
-    "Score": 43.48754443957434
+    "category": "spam",
+    "score": 43.48754443957434
 }
 ```
 - The POST payload should contain the raw text that you want to classify.
@@ -310,8 +316,8 @@ that have been trained. This list should be empty, indicating that the classifie
 has been flushed.
 ```
 {
-    "Success": true,
-    "Categories": {}
+    "success": true,
+    "categories": {}
 }
 ```
 - No payload or parameters are expected.

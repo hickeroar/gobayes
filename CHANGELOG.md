@@ -2,6 +2,43 @@
 
 All notable changes to this project are documented here.
 
+## v3.0.0
+
+### Breaking
+- Module path moved from `github.com/hickeroar/gobayes/v2` to `github.com/hickeroar/gobayes/v3`.
+- Library API signatures changed:
+  - `Classifier.Train(category, text string) error`
+  - `Classifier.Untrain(category, text string) error`
+- HTTP JSON response keys migrated from PascalCase to camelCase:
+  - `Category` -> `category`
+  - `Score` -> `score`
+  - `Success` -> `success`
+  - `Categories` -> `categories`
+  - `TokenTally` -> `tokenTally`
+  - `ProbInCat` -> `probInCat`
+  - `ProbNotInCat` -> `probNotInCat`
+
+### Added
+- Default tokenizer pipeline now applies Unicode normalization and English stemming, while still allowing a custom tokenizer override via `Classifier.Tokenizer`.
+- `bayes.ErrInvalidCategoryName` is returned when `Train`/`Untrain` receives a category that does not match `^[-_A-Za-z0-9]+$`.
+
+### Migration Notes
+- Update imports:
+  - from `github.com/hickeroar/gobayes/v2/bayes`
+  - to `github.com/hickeroar/gobayes/v3/bayes`
+- Handle errors from `Train` and `Untrain` in library consumers.
+- Update HTTP client decoders to camelCase keys.
+
+Before:
+```json
+{"Category":"spam","Score":43.48}
+```
+
+After:
+```json
+{"category":"spam","score":43.48}
+```
+
 ## v2.1.2
 
 ### Added

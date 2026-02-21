@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hickeroar/gobayes/v2/bayes"
+	"github.com/hickeroar/gobayes/v3/bayes"
 )
 
 func assertJSONContentType(t *testing.T, rr *httptest.ResponseRecorder) {

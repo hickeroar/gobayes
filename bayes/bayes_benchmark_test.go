@@ -7,9 +7,9 @@ import (
 
 func buildBenchmarkClassifier() *Classifier {
 	classifier := NewClassifier()
-	classifier.Train("tech", strings.Repeat("kubernetes latency tracing retries ", 50))
-	classifier.Train("finance", strings.Repeat("portfolio rebalancing volatility alpha beta ", 50))
-	classifier.Train("cooking", strings.Repeat("simmer saute reduction stock umami ", 50))
+	_ = classifier.Train("tech", strings.Repeat("kubernetes latency tracing retries ", 50))
+	_ = classifier.Train("finance", strings.Repeat("portfolio rebalancing volatility alpha beta ", 50))
+	_ = classifier.Train("cooking", strings.Repeat("simmer saute reduction stock umami ", 50))
 	return classifier
 }
 
@@ -19,7 +19,7 @@ func BenchmarkTrain(b *testing.B) {
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		classifier.Train("tech", sample)
+		_ = classifier.Train("tech", sample)
 	}
 }
 
