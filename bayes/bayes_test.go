@@ -7,6 +7,7 @@ import (
 	"github.com/hickeroar/gobayes/v3/bayes/category"
 )
 
+// TestTrainUntrainLifecycle verifies train untrain lifecycle.
 func TestTrainUntrainLifecycle(t *testing.T) {
 	classifier := NewClassifier()
 
@@ -43,6 +44,7 @@ func TestTrainUntrainLifecycle(t *testing.T) {
 	}
 }
 
+// TestClassifyAndScore verifies classify and score.
 func TestClassifyAndScore(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("spam", "free prize click now"); err != nil {
@@ -69,6 +71,7 @@ func TestClassifyAndScore(t *testing.T) {
 	}
 }
 
+// TestEmptyAndUnknownInput verifies empty and unknown input.
 func TestEmptyAndUnknownInput(t *testing.T) {
 	classifier := NewClassifier()
 
@@ -86,6 +89,7 @@ func TestEmptyAndUnknownInput(t *testing.T) {
 	}
 }
 
+// TestClassifyTieBreaksDeterministically verifies classify tie breaks deterministically.
 func TestClassifyTieBreaksDeterministically(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("alpha", "shared"); err != nil {
@@ -101,6 +105,7 @@ func TestClassifyTieBreaksDeterministically(t *testing.T) {
 	}
 }
 
+// TestTrainReturnsErrorForInvalidCategoryNames verifies train returns error for invalid category names.
 func TestTrainReturnsErrorForInvalidCategoryNames(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("", "hello world"); !errors.Is(err, ErrInvalidCategoryName) {
@@ -115,6 +120,7 @@ func TestTrainReturnsErrorForInvalidCategoryNames(t *testing.T) {
 	}
 }
 
+// TestUntrainReturnsErrorForInvalidCategoryNames verifies untrain returns error for invalid category names.
 func TestUntrainReturnsErrorForInvalidCategoryNames(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("spam", "buy now"); err != nil {
@@ -136,6 +142,7 @@ func TestUntrainReturnsErrorForInvalidCategoryNames(t *testing.T) {
 	}
 }
 
+// TestFlushClearsCategories verifies flush clears categories.
 func TestFlushClearsCategories(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("spam", "buy now"); err != nil {
@@ -147,6 +154,7 @@ func TestFlushClearsCategories(t *testing.T) {
 	}
 }
 
+// TestCustomTokenizerIsUsed verifies custom tokenizer is used.
 func TestCustomTokenizerIsUsed(t *testing.T) {
 	classifier := NewClassifier()
 	classifier.Tokenizer = func(string) []string {
@@ -165,6 +173,7 @@ func TestCustomTokenizerIsUsed(t *testing.T) {
 	}
 }
 
+// TestSummariesReturnsSnapshot verifies summaries returns snapshot.
 func TestSummariesReturnsSnapshot(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("spam", "buy now"); err != nil {
@@ -186,6 +195,7 @@ func TestSummariesReturnsSnapshot(t *testing.T) {
 	}
 }
 
+// TestCalculateBayesianProbabilityDenominatorZero verifies calculate bayesian probability denominator zero.
 func TestCalculateBayesianProbabilityDenominatorZero(t *testing.T) {
 	classifier := NewClassifier()
 	cat := category.NewCategory("x")
@@ -195,6 +205,7 @@ func TestCalculateBayesianProbabilityDenominatorZero(t *testing.T) {
 	}
 }
 
+// TestDefaultTokenizerNormalizesPunctuationAndStems verifies default tokenizer normalizes punctuation and stems.
 func TestDefaultTokenizerNormalizesPunctuationAndStems(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("run", "Running, RUNS! runner?"); err != nil {

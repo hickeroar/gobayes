@@ -19,15 +19,18 @@ type fakeServer struct {
 	listened    atomic.Bool
 }
 
+// ListenAndServe records a server start and returns a configured error.
 func (f *fakeServer) ListenAndServe() error {
 	f.listened.Store(true)
 	return f.listenErr
 }
 
+// Shutdown records a shutdown call and returns a configured error.
 func (f *fakeServer) Shutdown(context.Context) error {
 	return f.shutdownErr
 }
 
+// TestRunMainSuccessPath verifies run main success path.
 func TestRunMainSuccessPath(t *testing.T) {
 	oldRunMain := runMain
 	oldMakeSignal := makeSignalChannel
@@ -91,6 +94,7 @@ func TestRunMainSuccessPath(t *testing.T) {
 	}
 }
 
+// TestMainHandlesRunError verifies main handles run error.
 func TestMainHandlesRunError(t *testing.T) {
 	oldRunMain := runMain
 	oldLogFatal := logFatal

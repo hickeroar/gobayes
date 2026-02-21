@@ -14,6 +14,7 @@ import (
 	"github.com/hickeroar/gobayes/v3/bayes"
 )
 
+// assertJSONContentType verifies the response content type is JSON.
 func assertJSONContentType(t *testing.T, rr *httptest.ResponseRecorder) {
 	t.Helper()
 	contentType := rr.Header().Get("Content-Type")
@@ -22,6 +23,7 @@ func assertJSONContentType(t *testing.T, rr *httptest.ResponseRecorder) {
 	}
 }
 
+// assertJSONErrorShape verifies a JSON error response payload shape.
 func assertJSONErrorShape(t *testing.T, rr *httptest.ResponseRecorder) {
 	t.Helper()
 	assertJSONContentType(t, rr)
@@ -34,6 +36,7 @@ func assertJSONErrorShape(t *testing.T, rr *httptest.ResponseRecorder) {
 	}
 }
 
+// newTestServer creates a classifier API test server and mux.
 func newTestServer() (*ClassifierAPI, *http.ServeMux) {
 	api := &ClassifierAPI{
 		classifier: bayes.NewClassifier(),
@@ -44,11 +47,13 @@ func newTestServer() (*ClassifierAPI, *http.ServeMux) {
 	return api, mux
 }
 
+// newTestServerWithAuth creates an authenticated API test handler.
 func newTestServerWithAuth(token string) (*ClassifierAPI, http.Handler) {
 	api, mux := newTestServer()
 	return api, withAuthorizationToken(mux, token)
 }
 
+// TestClassifyMethodNotAllowed verifies classify method not allowed.
 func TestClassifyMethodNotAllowed(t *testing.T) {
 	_, mux := newTestServer()
 	req := httptest.NewRequest(http.MethodGet, "/classify", nil)
@@ -65,6 +70,7 @@ func TestClassifyMethodNotAllowed(t *testing.T) {
 	assertJSONErrorShape(t, rr)
 }
 
+// TestAuthorizationMiddlewareRejectsInvalidOrMissingToken verifies authorization middleware rejects invalid or missing token.
 func TestAuthorizationMiddlewareRejectsInvalidOrMissingToken(t *testing.T) {
 	_, handler := newTestServerWithAuth("secret-token")
 
@@ -99,6 +105,7 @@ func TestAuthorizationMiddlewareRejectsInvalidOrMissingToken(t *testing.T) {
 	}
 }
 
+// TestAuthorizationMiddlewareAllowsProtectedEndpointWithValidToken verifies authorization middleware allows protected endpoint with valid token.
 func TestAuthorizationMiddlewareAllowsProtectedEndpointWithValidToken(t *testing.T) {
 	_, handler := newTestServerWithAuth("secret-token")
 	req := httptest.NewRequest(http.MethodGet, "/info", nil)
@@ -113,6 +120,7 @@ func TestAuthorizationMiddlewareAllowsProtectedEndpointWithValidToken(t *testing
 	assertJSONContentType(t, rr)
 }
 
+// TestAuthorizationMiddlewareBypassesHealthAndReady verifies authorization middleware bypasses health and ready.
 func TestAuthorizationMiddlewareBypassesHealthAndReady(t *testing.T) {
 	api, handler := newTestServerWithAuth("secret-token")
 	api.ready.Store(true)
@@ -128,6 +136,7 @@ func TestAuthorizationMiddlewareBypassesHealthAndReady(t *testing.T) {
 	}
 }
 
+// TestTrainInfoFlushLifecycle verifies train info flush lifecycle.
 func TestTrainInfoFlushLifecycle(t *testing.T) {
 	_, mux := newTestServer()
 
@@ -177,6 +186,7 @@ func TestTrainInfoFlushLifecycle(t *testing.T) {
 	}
 }
 
+// TestInvalidCategoryRoute verifies invalid category route.
 func TestInvalidCategoryRoute(t *testing.T) {
 	_, mux := newTestServer()
 	req := httptest.NewRequest(http.MethodPost, "/train/spam!", strings.NewReader("text"))
@@ -189,6 +199,7 @@ func TestInvalidCategoryRoute(t *testing.T) {
 	}
 }
 
+// TestTrainAndUntrainHandlers verifies train and untrain handlers.
 func TestTrainAndUntrainHandlers(t *testing.T) {
 	_, mux := newTestServer()
 
@@ -207,6 +218,7 @@ func TestTrainAndUntrainHandlers(t *testing.T) {
 	}
 }
 
+// TestUntrainInvalidCategoryRoute verifies untrain invalid category route.
 func TestUntrainInvalidCategoryRoute(t *testing.T) {
 	_, mux := newTestServer()
 	req := httptest.NewRequest(http.MethodPost, "/untrain/spam!", strings.NewReader("text"))
@@ -218,6 +230,7 @@ func TestUntrainInvalidCategoryRoute(t *testing.T) {
 	assertJSONErrorShape(t, rr)
 }
 
+// TestScoreHandlerBadBody verifies score handler bad body.
 func TestScoreHandlerBadBody(t *testing.T) {
 	_, mux := newTestServer()
 	req := httptest.NewRequest(http.MethodPost, "/score", nil)
@@ -230,6 +243,7 @@ func TestScoreHandlerBadBody(t *testing.T) {
 	assertJSONErrorShape(t, rr)
 }
 
+// TestTrainHandlerBadBody verifies train handler bad body.
 func TestTrainHandlerBadBody(t *testing.T) {
 	_, mux := newTestServer()
 	req := httptest.NewRequest(http.MethodPost, "/train/spam", nil)
@@ -242,6 +256,7 @@ func TestTrainHandlerBadBody(t *testing.T) {
 	assertJSONErrorShape(t, rr)
 }
 
+// TestUntrainHandlerBadBody verifies untrain handler bad body.
 func TestUntrainHandlerBadBody(t *testing.T) {
 	_, mux := newTestServer()
 	req := httptest.NewRequest(http.MethodPost, "/untrain/spam", nil)
@@ -254,6 +269,7 @@ func TestUntrainHandlerBadBody(t *testing.T) {
 	assertJSONErrorShape(t, rr)
 }
 
+// TestTrainHandlerMethodNotAllowed verifies train handler method not allowed.
 func TestTrainHandlerMethodNotAllowed(t *testing.T) {
 	_, mux := newTestServer()
 	req := httptest.NewRequest(http.MethodGet, "/train/spam", nil)
@@ -265,6 +281,7 @@ func TestTrainHandlerMethodNotAllowed(t *testing.T) {
 	assertJSONErrorShape(t, rr)
 }
 
+// TestHealthHandlerMethodNotAllowed verifies health handler method not allowed.
 func TestHealthHandlerMethodNotAllowed(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/healthz", nil)
 	rr := httptest.NewRecorder()
@@ -275,6 +292,7 @@ func TestHealthHandlerMethodNotAllowed(t *testing.T) {
 	assertJSONErrorShape(t, rr)
 }
 
+// TestReadyHandlerMethodNotAllowed verifies ready handler method not allowed.
 func TestReadyHandlerMethodNotAllowed(t *testing.T) {
 	api, _ := newTestServer()
 	req := httptest.NewRequest(http.MethodPost, "/readyz", nil)
@@ -288,6 +306,7 @@ func TestReadyHandlerMethodNotAllowed(t *testing.T) {
 
 type errReader struct{}
 
+// Read returns a deterministic read failure for body-read error tests.
 func (errReader) Read([]byte) (int, error) {
 	return 0, errors.New("read failed")
 }
@@ -297,18 +316,22 @@ type failWriteRecorder struct {
 	status int
 }
 
+// Header returns the response header map.
 func (f *failWriteRecorder) Header() http.Header {
 	return f.header
 }
 
+// WriteHeader records the status code passed by the handler.
 func (f *failWriteRecorder) WriteHeader(statusCode int) {
 	f.status = statusCode
 }
 
+// Write returns a deterministic write failure for response-write tests.
 func (f *failWriteRecorder) Write([]byte) (int, error) {
 	return 0, errors.New("write failed")
 }
 
+// TestWriteJSONMarshalAndWriteErrors verifies write jsonmarshal and write errors.
 func TestWriteJSONMarshalAndWriteErrors(t *testing.T) {
 	rr := httptest.NewRecorder()
 	writeJSON(rr, http.StatusOK, map[string]interface{}{"bad": func() {}})
@@ -323,6 +346,7 @@ func TestWriteJSONMarshalAndWriteErrors(t *testing.T) {
 	}
 }
 
+// TestOversizedBodyRejected verifies oversized body rejected.
 func TestOversizedBodyRejected(t *testing.T) {
 	_, mux := newTestServer()
 	oversized := bytes.Repeat([]byte("a"), maxRequestBodyBytes+1)
@@ -337,6 +361,7 @@ func TestOversizedBodyRejected(t *testing.T) {
 	assertJSONErrorShape(t, rr)
 }
 
+// TestHealthAndReadyEndpoints verifies health and ready endpoints.
 func TestHealthAndReadyEndpoints(t *testing.T) {
 	api, mux := newTestServer()
 	api.ready.Store(true)
@@ -352,6 +377,7 @@ func TestHealthAndReadyEndpoints(t *testing.T) {
 	}
 }
 
+// TestReadyEndpointNotReady verifies ready endpoint not ready.
 func TestReadyEndpointNotReady(t *testing.T) {
 	api, mux := newTestServer()
 	api.ready.Store(false)
@@ -366,6 +392,7 @@ func TestReadyEndpointNotReady(t *testing.T) {
 	assertJSONContentType(t, rr)
 }
 
+// TestConcurrentRequests verifies concurrent requests.
 func TestConcurrentRequests(t *testing.T) {
 	_, mux := newTestServer()
 
@@ -400,6 +427,7 @@ func TestConcurrentRequests(t *testing.T) {
 	wg.Wait()
 }
 
+// TestAPIContractMatrix verifies apicontract matrix.
 func TestAPIContractMatrix(t *testing.T) {
 	type testCase struct {
 		name        string

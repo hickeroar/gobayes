@@ -92,11 +92,13 @@ func (cat Category) GetProbNotInCat() float64 {
 	return cat.probNotInCat
 }
 
+// setProbabilities updates cached prior probabilities for a category.
 func (cat *Category) setProbabilities(probInCat float64, probNotInCat float64) {
 	cat.probInCat = probInCat
 	cat.probNotInCat = probNotInCat
 }
 
+// exportState returns a copy of category state for persistence.
 func (cat *Category) exportState() PersistedCategory {
 	tokens := make(map[string]int, len(cat.tokens))
 	for token, count := range cat.tokens {

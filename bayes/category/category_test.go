@@ -2,6 +2,7 @@ package category
 
 import "testing"
 
+// TestTrainTokenCreatesAndIncrements verifies train token creates and increments.
 func TestTrainTokenCreatesAndIncrements(t *testing.T) {
 	cat := NewCategory("spam")
 
@@ -26,6 +27,7 @@ func TestTrainTokenCreatesAndIncrements(t *testing.T) {
 	}
 }
 
+// TestUntrainTokenDecrementsAndDeletes verifies untrain token decrements and deletes.
 func TestUntrainTokenDecrementsAndDeletes(t *testing.T) {
 	cat := NewCategory("spam")
 	if err := cat.TrainToken("buy", 5); err != nil {
@@ -56,6 +58,7 @@ func TestUntrainTokenDecrementsAndDeletes(t *testing.T) {
 	}
 }
 
+// TestUntrainTokenNoOpForMissingToken verifies untrain token no op for missing token.
 func TestUntrainTokenNoOpForMissingToken(t *testing.T) {
 	cat := NewCategory("ham")
 	if err := cat.TrainToken("hello", 2); err != nil {
@@ -74,6 +77,7 @@ func TestUntrainTokenNoOpForMissingToken(t *testing.T) {
 	}
 }
 
+// TestInvalidCountsReturnError verifies invalid counts return error.
 func TestInvalidCountsReturnError(t *testing.T) {
 	cat := NewCategory("ham")
 	if err := cat.TrainToken("hello", 2); err != nil {

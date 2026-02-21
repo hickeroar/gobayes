@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// FuzzCategoryFromPath fuzz-tests category from path.
 func FuzzCategoryFromPath(f *testing.F) {
 	f.Add("/train/spam", "/train/")
 	f.Add("/train/spam123", "/train/")
@@ -30,6 +31,7 @@ func FuzzCategoryFromPath(f *testing.F) {
 	})
 }
 
+// FuzzClassifyHandlerBody fuzz-tests classify handler body.
 func FuzzClassifyHandlerBody(f *testing.F) {
 	f.Add(http.MethodPost, "buy now")
 	f.Add(http.MethodPost, string(bytes.Repeat([]byte("a"), maxRequestBodyBytes+1)))

@@ -2,6 +2,7 @@ package bayes
 
 import "testing"
 
+// FuzzClassifierInvariants fuzz-tests classifier invariants.
 func FuzzClassifierInvariants(f *testing.F) {
 	f.Add("spam", "buy now buy now")
 	f.Add("ham", "hello world")

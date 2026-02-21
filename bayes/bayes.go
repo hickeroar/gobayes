@@ -184,6 +184,7 @@ func (c *Classifier) Summaries() map[string]category.CategorySummary {
 	return c.categories.Summaries()
 }
 
+// scoreUnlocked computes category scores while the classifier lock is already held.
 func (c *Classifier) scoreUnlocked(text string) map[string]float64 {
 	tokens := c.getTokenizer()(text)
 	occurrences := c.countTokenOccurrences(tokens)

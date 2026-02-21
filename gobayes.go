@@ -99,6 +99,7 @@ func (c *ClassifierAPI) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/readyz", c.ReadyHandler)
 }
 
+// writeJSON marshals a value and writes it as a JSON HTTP response.
 func writeJSON(w http.ResponseWriter, status int, value interface{}) {
 	jsonResponse, err := json.Marshal(value)
 	if err != nil {
@@ -113,10 +114,12 @@ func writeJSON(w http.ResponseWriter, status int, value interface{}) {
 	}
 }
 
+// writeError writes a JSON error payload with the given status code.
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
 }
 
+// readBody reads a bounded request body and returns the payload string.
 func readBody(w http.ResponseWriter, req *http.Request) (string, bool) {
 	req.Body = http.MaxBytesReader(w, req.Body, maxRequestBodyBytes)
 	defer req.Body.Close()
@@ -135,6 +138,7 @@ func readBody(w http.ResponseWriter, req *http.Request) (string, bool) {
 	return string(body), true
 }
 
+// categoryFromPath extracts and validates a category from a route path.
 func categoryFromPath(path, prefix string) (string, bool) {
 	category := strings.TrimPrefix(path, prefix)
 	if category == "" || strings.Contains(category, "/") {
@@ -148,6 +152,7 @@ func categoryFromPath(path, prefix string) (string, bool) {
 	return category, true
 }
 
+// requireMethod enforces a single HTTP method and writes 405 on mismatch.
 func requireMethod(w http.ResponseWriter, req *http.Request, method string) bool {
 	if req.Method != method {
 		w.Header().Set("Allow", method)
@@ -157,6 +162,7 @@ func requireMethod(w http.ResponseWriter, req *http.Request, method string) bool
 	return true
 }
 
+// withAuthorizationToken wraps a handler with bearer-token authorization checks.
 func withAuthorizationToken(next http.Handler, expectedToken string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == "/healthz" || req.URL.Path == "/readyz" {
@@ -291,6 +297,7 @@ func (c *ClassifierAPI) ReadyHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
 
+// main starts the Gobayes server process.
 func main() {
 	if err := runMain(); err != nil {
 		logFatal(err)

@@ -9,8 +9,8 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"path/filepath"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -26,6 +26,7 @@ type integrationServer struct {
 	output  *bytes.Buffer
 }
 
+// startIntegrationServer builds and starts a test server process.
 func startIntegrationServer(t *testing.T, authToken string) *integrationServer {
 	t.Helper()
 
@@ -78,6 +79,7 @@ func startIntegrationServer(t *testing.T, authToken string) *integrationServer {
 	return server
 }
 
+// waitForHealth polls the health endpoint until the server is ready.
 func waitForHealth(server *integrationServer) error {
 	deadline := time.Now().Add(8 * time.Second)
 	for time.Now().Before(deadline) {
@@ -97,6 +99,7 @@ func waitForHealth(server *integrationServer) error {
 	return context.DeadlineExceeded
 }
 
+// stop gracefully terminates the integration test server process.
 func (s *integrationServer) stop(t *testing.T) {
 	t.Helper()
 	if s.cmd.Process == nil {
@@ -118,6 +121,7 @@ func (s *integrationServer) stop(t *testing.T) {
 	}
 }
 
+// reservePort acquires an available localhost TCP port for tests.
 func reservePort(t *testing.T) int {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -133,6 +137,7 @@ func reservePort(t *testing.T) int {
 	return addr.Port
 }
 
+// sendRequest performs an HTTP request against the integration test server.
 func sendRequest(t *testing.T, server *integrationServer, method, path, body, token string) *http.Response {
 	t.Helper()
 
@@ -151,6 +156,7 @@ func sendRequest(t *testing.T, server *integrationServer, method, path, body, to
 	return resp
 }
 
+// decodeJSON decodes an HTTP JSON response body into T.
 func decodeJSON[T any](t *testing.T, resp *http.Response) T {
 	t.Helper()
 	defer resp.Body.Close()
@@ -166,6 +172,7 @@ func decodeJSON[T any](t *testing.T, resp *http.Response) T {
 	return payload
 }
 
+// TestIntegrationLifecycleFlow verifies integration lifecycle flow.
 func TestIntegrationLifecycleFlow(t *testing.T) {
 	server := startIntegrationServer(t, "")
 
@@ -239,6 +246,7 @@ func TestIntegrationLifecycleFlow(t *testing.T) {
 	}
 }
 
+// TestIntegrationAuthAndProbes verifies integration auth and probes.
 func TestIntegrationAuthAndProbes(t *testing.T) {
 	server := startIntegrationServer(t, "secret-token")
 
@@ -277,6 +285,7 @@ func TestIntegrationAuthAndProbes(t *testing.T) {
 	_ = decodeJSON[map[string]interface{}](t, resp)
 }
 
+// TestIntegrationErrorContracts verifies integration error contracts.
 func TestIntegrationErrorContracts(t *testing.T) {
 	server := startIntegrationServer(t, "")
 

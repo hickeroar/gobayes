@@ -2,6 +2,7 @@ package category
 
 import "testing"
 
+// TestAddCategoryCreatesAndReturnsCategory verifies add category creates and returns category.
 func TestAddCategoryCreatesAndReturnsCategory(t *testing.T) {
 	cats := NewCategories()
 	cat := cats.AddCategory("spam")
@@ -19,6 +20,7 @@ func TestAddCategoryCreatesAndReturnsCategory(t *testing.T) {
 	}
 }
 
+// TestGetCategoryReturnsExistingAndCreatesMissing verifies get category returns existing and creates missing.
 func TestGetCategoryReturnsExistingAndCreatesMissing(t *testing.T) {
 	cats := NewCategories()
 
@@ -35,6 +37,7 @@ func TestGetCategoryReturnsExistingAndCreatesMissing(t *testing.T) {
 	}
 }
 
+// TestDeleteCategoryRemovesCategory verifies delete category removes category.
 func TestDeleteCategoryRemovesCategory(t *testing.T) {
 	cats := NewCategories()
 	cats.AddCategory("spam")
@@ -51,6 +54,7 @@ func TestDeleteCategoryRemovesCategory(t *testing.T) {
 	}
 }
 
+// TestNamesReturnsCategoryNames verifies names returns category names.
 func TestNamesReturnsCategoryNames(t *testing.T) {
 	cats := NewCategories()
 	cats.AddCategory("spam")
@@ -62,6 +66,7 @@ func TestNamesReturnsCategoryNames(t *testing.T) {
 	}
 }
 
+// TestSummariesReturnsValueSnapshot verifies summaries returns value snapshot.
 func TestSummariesReturnsValueSnapshot(t *testing.T) {
 	cats := NewCategories()
 	created := cats.AddCategory("spam")
@@ -84,6 +89,7 @@ func TestSummariesReturnsValueSnapshot(t *testing.T) {
 	}
 }
 
+// TestExportAndReplaceStates verifies export and replace states.
 func TestExportAndReplaceStates(t *testing.T) {
 	original := NewCategories()
 	spam := original.GetCategory("spam")
@@ -113,6 +119,7 @@ func TestExportAndReplaceStates(t *testing.T) {
 	}
 }
 
+// TestReplaceStatesRejectsInvalidState verifies replace states rejects invalid state.
 func TestReplaceStatesRejectsInvalidState(t *testing.T) {
 	cats := NewCategories()
 	err := cats.ReplaceStates(map[string]PersistedCategory{
@@ -123,6 +130,7 @@ func TestReplaceStatesRejectsInvalidState(t *testing.T) {
 	}
 }
 
+// TestReplaceStatesRejectsInvalidTokenCount verifies replace states rejects invalid token count.
 func TestReplaceStatesRejectsInvalidTokenCount(t *testing.T) {
 	cats := NewCategories()
 	err := cats.ReplaceStates(map[string]PersistedCategory{
@@ -133,6 +141,7 @@ func TestReplaceStatesRejectsInvalidTokenCount(t *testing.T) {
 	}
 }
 
+// TestEnsureCategoryProbabilitiesNoOpWhenClean verifies ensure category probabilities no op when clean.
 func TestEnsureCategoryProbabilitiesNoOpWhenClean(t *testing.T) {
 	cats := NewCategories()
 	spam := cats.GetCategory("spam")
@@ -150,6 +159,7 @@ func TestEnsureCategoryProbabilitiesNoOpWhenClean(t *testing.T) {
 	}
 }
 
+// TestMarkProbabilitiesDirtyForcesRecalc verifies mark probabilities dirty forces recalc.
 func TestMarkProbabilitiesDirtyForcesRecalc(t *testing.T) {
 	cats := NewCategories()
 	spam := cats.GetCategory("spam")

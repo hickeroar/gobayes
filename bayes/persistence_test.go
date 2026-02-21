@@ -13,6 +13,7 @@ import (
 	"github.com/hickeroar/gobayes/v3/bayes/category"
 )
 
+// TestPersistenceRoundTrip verifies persistence round trip.
 func TestPersistenceRoundTrip(t *testing.T) {
 	original := NewClassifier()
 	if err := original.Train("spam", "buy now limited offer click"); err != nil {
@@ -56,6 +57,7 @@ func TestPersistenceRoundTrip(t *testing.T) {
 	}
 }
 
+// TestLoadReplacesExistingState verifies load replaces existing state.
 func TestLoadReplacesExistingState(t *testing.T) {
 	source := NewClassifier()
 	if err := source.Train("spam", "buy now"); err != nil {
@@ -87,6 +89,7 @@ func TestLoadReplacesExistingState(t *testing.T) {
 	}
 }
 
+// TestLoadRejectsInvalidPersistedState verifies load rejects invalid persisted state.
 func TestLoadRejectsInvalidPersistedState(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -163,6 +166,7 @@ func TestLoadRejectsInvalidPersistedState(t *testing.T) {
 	}
 }
 
+// TestEmptyModelRoundTrip verifies empty model round trip.
 func TestEmptyModelRoundTrip(t *testing.T) {
 	classifier := NewClassifier()
 	var buf bytes.Buffer
@@ -181,6 +185,7 @@ func TestEmptyModelRoundTrip(t *testing.T) {
 	}
 }
 
+// TestSaveToFileAndLoadFromFile verifies save to file and load from file.
 func TestSaveToFileAndLoadFromFile(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("tech", "latency retries tracing"); err != nil {
@@ -206,6 +211,7 @@ func TestSaveToFileAndLoadFromFile(t *testing.T) {
 	}
 }
 
+// TestSaveLoadRejectRelativePaths verifies save load reject relative paths.
 func TestSaveLoadRejectRelativePaths(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("spam", "buy now"); err != nil {
@@ -221,6 +227,7 @@ func TestSaveLoadRejectRelativePaths(t *testing.T) {
 	}
 }
 
+// TestSaveLoadDefaultPath verifies save load default path.
 func TestSaveLoadDefaultPath(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("spam", "buy now"); err != nil {
@@ -246,6 +253,7 @@ func TestSaveLoadDefaultPath(t *testing.T) {
 	}
 }
 
+// TestSaveAndLoadNilAndDecodeErrors verifies save and load nil and decode errors.
 func TestSaveAndLoadNilAndDecodeErrors(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Save(nil); err == nil {
@@ -261,10 +269,12 @@ func TestSaveAndLoadNilAndDecodeErrors(t *testing.T) {
 
 type failWriter struct{}
 
+// Write returns a deterministic write failure for save error tests.
 func (failWriter) Write([]byte) (int, error) {
 	return 0, errors.New("write failed")
 }
 
+// TestSaveWriterError verifies save writer error.
 func TestSaveWriterError(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("spam", "buy now"); err != nil {
@@ -275,6 +285,7 @@ func TestSaveWriterError(t *testing.T) {
 	}
 }
 
+// TestSaveToFileErrors verifies save to file errors.
 func TestSaveToFileErrors(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("spam", "buy now"); err != nil {
@@ -293,14 +304,17 @@ func TestSaveToFileErrors(t *testing.T) {
 
 type failReadCloser struct{}
 
+// Read returns a deterministic read failure for load error tests.
 func (failReadCloser) Read([]byte) (int, error) {
 	return 0, errors.New("read failed")
 }
 
+// Close satisfies io.ReadCloser for test doubles.
 func (failReadCloser) Close() error {
 	return nil
 }
 
+// TestLoadFromFileAndLoadReaderErrors verifies load from file and load reader errors.
 func TestLoadFromFileAndLoadReaderErrors(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.LoadFromFile("relative.gob"); err == nil {
@@ -321,6 +335,7 @@ type fakeTempFile struct {
 	closeErr error
 }
 
+// Write returns either a configured error or reports bytes written.
 func (f *fakeTempFile) Write(p []byte) (int, error) {
 	if f.writeErr != nil {
 		return 0, f.writeErr
@@ -328,18 +343,22 @@ func (f *fakeTempFile) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// Sync returns the configured sync error.
 func (f *fakeTempFile) Sync() error {
 	return f.syncErr
 }
 
+// Close returns the configured close error.
 func (f *fakeTempFile) Close() error {
 	return f.closeErr
 }
 
+// Name returns the fake temp file name.
 func (f *fakeTempFile) Name() string {
 	return f.name
 }
 
+// TestSaveToFileSyncCloseAndRenameErrors verifies save to file sync close and rename errors.
 func TestSaveToFileSyncCloseAndRenameErrors(t *testing.T) {
 	classifier := NewClassifier()
 	if err := classifier.Train("spam", "buy now"); err != nil {

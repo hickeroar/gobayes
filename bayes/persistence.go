@@ -135,6 +135,7 @@ func (c *Classifier) LoadFromFile(path string) error {
 	return c.Load(f)
 }
 
+// validateModelState validates persisted classifier state before loading.
 func validateModelState(state modelState) error {
 	if state.Version != persistedModelVersion {
 		return fmt.Errorf("%w: %d", errUnsupportedVersion, state.Version)
@@ -165,6 +166,7 @@ func validateModelState(state modelState) error {
 	return nil
 }
 
+// resolveModelPath returns the default model path when no path is provided.
 func resolveModelPath(path string) string {
 	if path == "" {
 		return defaultModelFilePath
