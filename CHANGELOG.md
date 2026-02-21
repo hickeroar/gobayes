@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## v2.1.1
+
+### Added
+- Subprocess-backed integration tests that start the real Gobayes server and validate end-to-end API behavior.
+- Dedicated CI integration lane running `go test -tags=integration -run '^TestIntegration' .`.
+
+### Changed
+- Disabled `actions/setup-go` cache (`cache: false`) across CI jobs to avoid `go.sum` cache warnings for this stdlib-only module.
+- CI workflow now triggers on `pull_request` (plus manual/scheduled runs), removing duplicate PR branch runs from `push` + `pull_request`.
+
 ## v2.1.0
 
 ### Added
