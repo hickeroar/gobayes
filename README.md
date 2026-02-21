@@ -143,6 +143,7 @@ File helper note:
 ```
 $ go test ./...
 $ go test -race ./...
+$ go test -tags=integration -run '^TestIntegration' .
 ```
 
 ---
