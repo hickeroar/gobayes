@@ -1,15 +1,18 @@
 package bayes
 
 import (
+	"errors"
 	"testing"
 
-	"github.com/hickeroar/gobayes/v2/bayes/category"
+	"github.com/hickeroar/gobayes/v3/bayes/category"
 )
 
 func TestTrainUntrainLifecycle(t *testing.T) {
 	classifier := NewClassifier()
 
-	classifier.Train("spam", "buy now buy now")
+	if err := classifier.Train("spam", "buy now buy now"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 	spam, ok := classifier.categories.LookupCategory("spam")
 	if !ok {
 		t.Fatal("expected spam category to exist after training")
@@ -21,7 +24,9 @@ func TestTrainUntrainLifecycle(t *testing.T) {
 		t.Fatalf("unexpected buy token count: got %d, want 2", spam.GetTokenCount("buy"))
 	}
 
-	classifier.Untrain("spam", "buy now")
+	if err := classifier.Untrain("spam", "buy now"); err != nil {
+		t.Fatalf("unexpected untrain error: %v", err)
+	}
 	spam, ok = classifier.categories.LookupCategory("spam")
 	if !ok {
 		t.Fatal("expected spam category to still exist")
@@ -30,7 +35,9 @@ func TestTrainUntrainLifecycle(t *testing.T) {
 		t.Fatalf("unexpected spam tally after untrain: got %d, want 2", spam.GetTally())
 	}
 
-	classifier.Untrain("spam", "buy now")
+	if err := classifier.Untrain("spam", "buy now"); err != nil {
+		t.Fatalf("unexpected untrain error: %v", err)
+	}
 	if _, ok := classifier.categories.LookupCategory("spam"); ok {
 		t.Fatal("expected spam category to be removed when tally reaches zero")
 	}
@@ -38,8 +45,12 @@ func TestTrainUntrainLifecycle(t *testing.T) {
 
 func TestClassifyAndScore(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("spam", "free prize click now")
-	classifier.Train("ham", "team meeting schedule project")
+	if err := classifier.Train("spam", "free prize click now"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
+	if err := classifier.Train("ham", "team meeting schedule project"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 
 	classification := classifier.Classify("free prize now")
 	if classification.Category != "spam" {
@@ -66,7 +77,9 @@ func TestEmptyAndUnknownInput(t *testing.T) {
 		t.Fatalf("expected empty category for empty classifier, got %q", classification.Category)
 	}
 
-	classifier.Train("ham", "hello world")
+	if err := classifier.Train("ham", "hello world"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 	scores := classifier.Score("unseen tokens only")
 	if len(scores) != 0 {
 		t.Fatalf("expected no scores for unknown tokens, got %d entries", len(scores))
@@ -75,8 +88,12 @@ func TestEmptyAndUnknownInput(t *testing.T) {
 
 func TestClassifyTieBreaksDeterministically(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("alpha", "shared")
-	classifier.Train("zeta", "shared")
+	if err := classifier.Train("alpha", "shared"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
+	if err := classifier.Train("zeta", "shared"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 
 	classification := classifier.Classify("shared")
 	if classification.Category != "alpha" {
@@ -84,21 +101,31 @@ func TestClassifyTieBreaksDeterministically(t *testing.T) {
 	}
 }
 
-func TestTrainIgnoresInvalidCategoryNames(t *testing.T) {
+func TestTrainReturnsErrorForInvalidCategoryNames(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("", "hello world")
-	classifier.Train("spam!", "hello world")
+	if err := classifier.Train("", "hello world"); !errors.Is(err, ErrInvalidCategoryName) {
+		t.Fatalf("expected ErrInvalidCategoryName for empty category, got %v", err)
+	}
+	if err := classifier.Train("spam!", "hello world"); !errors.Is(err, ErrInvalidCategoryName) {
+		t.Fatalf("expected ErrInvalidCategoryName for invalid category, got %v", err)
+	}
 
 	if len(classifier.categories.Names()) != 0 {
 		t.Fatalf("expected no categories for invalid names, got %v", classifier.categories.Names())
 	}
 }
 
-func TestUntrainIgnoresInvalidCategoryNames(t *testing.T) {
+func TestUntrainReturnsErrorForInvalidCategoryNames(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("spam", "buy now")
-	classifier.Untrain("", "buy now")
-	classifier.Untrain("spam!", "buy now")
+	if err := classifier.Train("spam", "buy now"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
+	if err := classifier.Untrain("", "buy now"); !errors.Is(err, ErrInvalidCategoryName) {
+		t.Fatalf("expected ErrInvalidCategoryName for empty category, got %v", err)
+	}
+	if err := classifier.Untrain("spam!", "buy now"); !errors.Is(err, ErrInvalidCategoryName) {
+		t.Fatalf("expected ErrInvalidCategoryName for invalid category, got %v", err)
+	}
 
 	cat, ok := classifier.categories.LookupCategory("spam")
 	if !ok {
@@ -111,7 +138,9 @@ func TestUntrainIgnoresInvalidCategoryNames(t *testing.T) {
 
 func TestFlushClearsCategories(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("spam", "buy now")
+	if err := classifier.Train("spam", "buy now"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 	classifier.Flush()
 	if got := len(classifier.categories.Names()); got != 0 {
 		t.Fatalf("expected zero categories after flush, got %d", got)
@@ -123,7 +152,9 @@ func TestCustomTokenizerIsUsed(t *testing.T) {
 	classifier.Tokenizer = func(string) []string {
 		return []string{"custom", "custom", "token"}
 	}
-	classifier.Train("tech", "ignored")
+	if err := classifier.Train("tech", "ignored"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 
 	cat, ok := classifier.categories.LookupCategory("tech")
 	if !ok {
@@ -136,8 +167,12 @@ func TestCustomTokenizerIsUsed(t *testing.T) {
 
 func TestSummariesReturnsSnapshot(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("spam", "buy now")
-	classifier.Train("ham", "team meeting project")
+	if err := classifier.Train("spam", "buy now"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
+	if err := classifier.Train("ham", "team meeting project"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 
 	summaries := classifier.Summaries()
 	if len(summaries) != 2 {
@@ -157,5 +192,24 @@ func TestCalculateBayesianProbabilityDenominatorZero(t *testing.T) {
 	got := classifier.calculateBayesianProbability(*cat, 0, 1)
 	if got != 0.0 {
 		t.Fatalf("expected 0 probability when denominator is zero, got %f", got)
+	}
+}
+
+func TestDefaultTokenizerNormalizesPunctuationAndStems(t *testing.T) {
+	classifier := NewClassifier()
+	if err := classifier.Train("run", "Running, RUNS! runner?"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
+
+	cat, ok := classifier.categories.LookupCategory("run")
+	if !ok {
+		t.Fatal("expected run category")
+	}
+
+	if got := cat.GetTokenCount("run"); got < 2 {
+		t.Fatalf("expected stemming to accumulate run tokens, got %d", got)
+	}
+	if got := cat.GetTokenCount("running"); got != 0 {
+		t.Fatalf("expected running token to be stemmed away, got %d", got)
 	}
 }

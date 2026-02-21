@@ -13,9 +13,9 @@ func FuzzClassifierInvariants(f *testing.F) {
 		if category == "" {
 			category = "default"
 		}
-		classifier.Train(category, sample)
-		classifier.Untrain(category, sample)
-		classifier.Train(category, sample+" "+sample)
+		_ = classifier.Train(category, sample)
+		_ = classifier.Untrain(category, sample)
+		_ = classifier.Train(category, sample+" "+sample)
 		_ = classifier.Score(sample)
 		_ = classifier.Classify(sample)
 

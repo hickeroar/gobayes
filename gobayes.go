@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hickeroar/gobayes/v2/bayes"
+	"github.com/hickeroar/gobayes/v3/bayes"
 )
 
 const maxRequestBodyBytes = 1 << 20 // 1 MiB
@@ -208,7 +208,7 @@ func (c *ClassifierAPI) TrainHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	c.classifier.Train(category, body)
+	_ = c.classifier.Train(category, body)
 	writeJSON(w, http.StatusOK, NewTrainingClassifierResponse(c, true))
 }
 
@@ -229,7 +229,7 @@ func (c *ClassifierAPI) UntrainHandler(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	c.classifier.Untrain(category, body)
+	_ = c.classifier.Untrain(category, body)
 	writeJSON(w, http.StatusOK, NewTrainingClassifierResponse(c, true))
 }
 

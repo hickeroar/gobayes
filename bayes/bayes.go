@@ -1,18 +1,22 @@
 package bayes
 
 import (
+	"errors"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
+	"unicode"
 
-	"github.com/hickeroar/gobayes/v2/bayes/category"
+	"github.com/hickeroar/gobayes/v3/bayes/category"
+	"github.com/kljensen/snowball"
+	"golang.org/x/text/unicode/norm"
 )
 
 // Classification is the result of classifying a text sample.
 type Classification struct {
-	Category string  `json:"Category"`
-	Score    float64 `json:"Score"`
+	Category string  `json:"category"`
+	Score    float64 `json:"score"`
 }
 
 // Classifier trains text categories and classifies new text samples.
@@ -24,6 +28,9 @@ type Classifier struct {
 
 var categoryNamePattern = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
 
+// ErrInvalidCategoryName indicates category input did not match the allowed pattern.
+var ErrInvalidCategoryName = errors.New("invalid category name")
+
 // NewClassifier returns a new Classifier instance.
 func NewClassifier() *Classifier {
 	return &Classifier{
@@ -31,10 +38,24 @@ func NewClassifier() *Classifier {
 	}
 }
 
-// tokenizeText lowercases and tokenizes text using whitespace separation.
+// tokenizeText normalizes, tokenizes, and stems input text.
 func (c *Classifier) tokenizeText(sample string) []string {
+	sample = norm.NFKC.String(sample)
 	sample = strings.ToLower(sample)
-	return strings.Fields(sample)
+	rawTokens := strings.FieldsFunc(sample, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+
+	tokens := make([]string, 0, len(rawTokens))
+	for _, token := range rawTokens {
+		stemmed, err := snowball.Stem(token, "english", true)
+		if err == nil && stemmed != "" {
+			token = stemmed
+		}
+		tokens = append(tokens, token)
+	}
+
+	return tokens
 }
 
 // getTokenizer returns the configured tokenizer or the default tokenizer.
@@ -66,12 +87,12 @@ func (c *Classifier) Flush() {
 }
 
 // Train updates a category with token counts from a text sample.
-func (c *Classifier) Train(category string, text string) {
+func (c *Classifier) Train(category string, text string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if !categoryNamePattern.MatchString(category) {
-		return
+		return ErrInvalidCategoryName
 	}
 
 	cat := c.categories.GetCategory(category)
@@ -85,15 +106,16 @@ func (c *Classifier) Train(category string, text string) {
 
 	c.cleanUpCategory(cat)
 	c.categories.EnsureCategoryProbabilities()
+	return nil
 }
 
 // Untrain removes token counts from a category using a text sample.
-func (c *Classifier) Untrain(category string, text string) {
+func (c *Classifier) Untrain(category string, text string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if !categoryNamePattern.MatchString(category) {
-		return
+		return ErrInvalidCategoryName
 	}
 
 	cat := c.categories.GetCategory(category)
@@ -107,6 +129,7 @@ func (c *Classifier) Untrain(category string, text string) {
 
 	c.cleanUpCategory(cat)
 	c.categories.EnsureCategoryProbabilities()
+	return nil
 }
 
 // cleanUpCategory removes an empty category.

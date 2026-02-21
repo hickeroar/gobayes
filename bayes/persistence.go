@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hickeroar/gobayes/v2/bayes/category"
+	"github.com/hickeroar/gobayes/v3/bayes/category"
 )
 
 const persistedModelVersion = 1

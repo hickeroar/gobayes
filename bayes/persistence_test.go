@@ -10,13 +10,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hickeroar/gobayes/v2/bayes/category"
+	"github.com/hickeroar/gobayes/v3/bayes/category"
 )
 
 func TestPersistenceRoundTrip(t *testing.T) {
 	original := NewClassifier()
-	original.Train("spam", "buy now limited offer click")
-	original.Train("ham", "team meeting project update")
+	if err := original.Train("spam", "buy now limited offer click"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
+	if err := original.Train("ham", "team meeting project update"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 
 	query := "limited offer now"
 	wantClass := original.Classify(query)
@@ -54,7 +58,9 @@ func TestPersistenceRoundTrip(t *testing.T) {
 
 func TestLoadReplacesExistingState(t *testing.T) {
 	source := NewClassifier()
-	source.Train("spam", "buy now")
+	if err := source.Train("spam", "buy now"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 
 	var buf bytes.Buffer
 	if err := source.Save(&buf); err != nil {
@@ -62,7 +68,9 @@ func TestLoadReplacesExistingState(t *testing.T) {
 	}
 
 	target := NewClassifier()
-	target.Train("ham", "team meeting")
+	if err := target.Train("ham", "team meeting"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 	if _, ok := target.categories.LookupCategory("ham"); !ok {
 		t.Fatal("expected preexisting ham category")
 	}
@@ -175,7 +183,9 @@ func TestEmptyModelRoundTrip(t *testing.T) {
 
 func TestSaveToFileAndLoadFromFile(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("tech", "latency retries tracing")
+	if err := classifier.Train("tech", "latency retries tracing"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 
 	modelPath := filepath.Join(t.TempDir(), "model.gob")
 	if err := classifier.SaveToFile(modelPath); err != nil {
@@ -198,7 +208,9 @@ func TestSaveToFileAndLoadFromFile(t *testing.T) {
 
 func TestSaveLoadRejectRelativePaths(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("spam", "buy now")
+	if err := classifier.Train("spam", "buy now"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 
 	if err := classifier.SaveToFile("model.gob"); err == nil {
 		t.Fatal("expected SaveToFile to reject relative path")
@@ -211,7 +223,9 @@ func TestSaveLoadRejectRelativePaths(t *testing.T) {
 
 func TestSaveLoadDefaultPath(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("spam", "buy now")
+	if err := classifier.Train("spam", "buy now"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 
 	defaultPath := "/tmp/gobayes.gob"
 	_ = os.Remove(defaultPath)
@@ -253,7 +267,9 @@ func (failWriter) Write([]byte) (int, error) {
 
 func TestSaveWriterError(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("spam", "buy now")
+	if err := classifier.Train("spam", "buy now"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 	if err := classifier.Save(failWriter{}); err == nil {
 		t.Fatal("expected save to fail for writer error")
 	}
@@ -261,7 +277,9 @@ func TestSaveWriterError(t *testing.T) {
 
 func TestSaveToFileErrors(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("spam", "buy now")
+	if err := classifier.Train("spam", "buy now"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 
 	if err := classifier.SaveToFile("relative.gob"); err == nil {
 		t.Fatal("expected relative path error")
@@ -324,7 +342,9 @@ func (f *fakeTempFile) Name() string {
 
 func TestSaveToFileSyncCloseAndRenameErrors(t *testing.T) {
 	classifier := NewClassifier()
-	classifier.Train("spam", "buy now")
+	if err := classifier.Train("spam", "buy now"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
 
 	origCreateTemp := createTemp
 	origRenameFile := renameFile
