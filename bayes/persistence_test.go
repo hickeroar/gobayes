@@ -63,7 +63,7 @@ func TestLoadReplacesExistingState(t *testing.T) {
 
 	target := NewClassifier()
 	target.Train("ham", "team meeting")
-	if _, ok := target.Categories.LookupCategory("ham"); !ok {
+	if _, ok := target.categories.LookupCategory("ham"); !ok {
 		t.Fatal("expected preexisting ham category")
 	}
 
@@ -71,10 +71,10 @@ func TestLoadReplacesExistingState(t *testing.T) {
 		t.Fatalf("load failed: %v", err)
 	}
 
-	if _, ok := target.Categories.LookupCategory("ham"); ok {
+	if _, ok := target.categories.LookupCategory("ham"); ok {
 		t.Fatal("expected ham category to be removed by replace-all load")
 	}
-	if _, ok := target.Categories.LookupCategory("spam"); !ok {
+	if _, ok := target.categories.LookupCategory("spam"); !ok {
 		t.Fatal("expected spam category after load")
 	}
 }
@@ -168,7 +168,7 @@ func TestEmptyModelRoundTrip(t *testing.T) {
 		t.Fatalf("load failed: %v", err)
 	}
 
-	if got := len(loaded.Categories.Names()); got != 0 {
+	if got := len(loaded.categories.Names()); got != 0 {
 		t.Fatalf("expected no categories after empty round-trip, got %d", got)
 	}
 }

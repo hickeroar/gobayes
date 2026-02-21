@@ -27,3 +27,4 @@ debug
 vendor/
 gobayes
 coverage.out
+coverage_cat.out

@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+## v2.1.2
+
+### Added
+- `Classifier.Summaries()` as the public summary/snapshot accessor used by HTTP responses.
+- Regression coverage for summary snapshots and idempotent probability refresh behavior.
+- `coverage_cat.out` to `.gitignore` to keep local coverage artifacts out of commits.
+
+### Changed
+- Concurrency handling in classifier read paths: `Classify` and `Score` now use read locks.
+- Probability refresh now occurs during state mutation/load paths instead of score-time recalculation.
+- HTTP controller now keeps a pointer to `bayes.Classifier` and relies on classifier-level locking (removed redundant API-level mutex locking).
+- Internal category state on `Classifier` is now encapsulated and no longer exposed as a public field.
+
+### Notes
+- HTTP endpoint behavior and JSON response shapes remain compatible.
+- Go package consumers that previously accessed `Classifier.Categories` directly should migrate to public methods (including `Summaries()`).
+
 ## v2.1.1
 
 ### Added

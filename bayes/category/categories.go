@@ -103,9 +103,8 @@ func (cats *Categories) EnsureCategoryProbabilities() {
 }
 
 // Summaries returns a response-oriented snapshot of category data.
+// Callers must ensure probabilities are fresh before calling.
 func (cats *Categories) Summaries() map[string]CategorySummary {
-	cats.EnsureCategoryProbabilities()
-
 	snapshot := make(map[string]CategorySummary, len(cats.categories))
 	for name, cat := range cats.categories {
 		snapshot[name] = CategorySummary{

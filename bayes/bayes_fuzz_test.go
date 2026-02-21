@@ -19,8 +19,8 @@ func FuzzClassifierInvariants(f *testing.F) {
 		_ = classifier.Score(sample)
 		_ = classifier.Classify(sample)
 
-		for _, name := range classifier.Categories.Names() {
-			cat, ok := classifier.Categories.LookupCategory(name)
+		for _, name := range classifier.categories.Names() {
+			cat, ok := classifier.categories.LookupCategory(name)
 			if !ok {
 				continue
 			}

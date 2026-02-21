@@ -10,7 +10,7 @@ func TestTrainUntrainLifecycle(t *testing.T) {
 	classifier := NewClassifier()
 
 	classifier.Train("spam", "buy now buy now")
-	spam, ok := classifier.Categories.LookupCategory("spam")
+	spam, ok := classifier.categories.LookupCategory("spam")
 	if !ok {
 		t.Fatal("expected spam category to exist after training")
 	}
@@ -22,7 +22,7 @@ func TestTrainUntrainLifecycle(t *testing.T) {
 	}
 
 	classifier.Untrain("spam", "buy now")
-	spam, ok = classifier.Categories.LookupCategory("spam")
+	spam, ok = classifier.categories.LookupCategory("spam")
 	if !ok {
 		t.Fatal("expected spam category to still exist")
 	}
@@ -31,7 +31,7 @@ func TestTrainUntrainLifecycle(t *testing.T) {
 	}
 
 	classifier.Untrain("spam", "buy now")
-	if _, ok := classifier.Categories.LookupCategory("spam"); ok {
+	if _, ok := classifier.categories.LookupCategory("spam"); ok {
 		t.Fatal("expected spam category to be removed when tally reaches zero")
 	}
 }
@@ -89,8 +89,8 @@ func TestTrainIgnoresInvalidCategoryNames(t *testing.T) {
 	classifier.Train("", "hello world")
 	classifier.Train("spam!", "hello world")
 
-	if len(classifier.Categories.Names()) != 0 {
-		t.Fatalf("expected no categories for invalid names, got %v", classifier.Categories.Names())
+	if len(classifier.categories.Names()) != 0 {
+		t.Fatalf("expected no categories for invalid names, got %v", classifier.categories.Names())
 	}
 }
 
@@ -100,7 +100,7 @@ func TestUntrainIgnoresInvalidCategoryNames(t *testing.T) {
 	classifier.Untrain("", "buy now")
 	classifier.Untrain("spam!", "buy now")
 
-	cat, ok := classifier.Categories.LookupCategory("spam")
+	cat, ok := classifier.categories.LookupCategory("spam")
 	if !ok {
 		t.Fatal("expected spam category to remain")
 	}
@@ -113,7 +113,7 @@ func TestFlushClearsCategories(t *testing.T) {
 	classifier := NewClassifier()
 	classifier.Train("spam", "buy now")
 	classifier.Flush()
-	if got := len(classifier.Categories.Names()); got != 0 {
+	if got := len(classifier.categories.Names()); got != 0 {
 		t.Fatalf("expected zero categories after flush, got %d", got)
 	}
 }
@@ -125,12 +125,29 @@ func TestCustomTokenizerIsUsed(t *testing.T) {
 	}
 	classifier.Train("tech", "ignored")
 
-	cat, ok := classifier.Categories.LookupCategory("tech")
+	cat, ok := classifier.categories.LookupCategory("tech")
 	if !ok {
 		t.Fatal("expected tech category")
 	}
 	if got := cat.GetTokenCount("custom"); got != 2 {
 		t.Fatalf("expected custom token count 2, got %d", got)
+	}
+}
+
+func TestSummariesReturnsSnapshot(t *testing.T) {
+	classifier := NewClassifier()
+	classifier.Train("spam", "buy now")
+	classifier.Train("ham", "team meeting project")
+
+	summaries := classifier.Summaries()
+	if len(summaries) != 2 {
+		t.Fatalf("expected 2 category summaries, got %d", len(summaries))
+	}
+	if summaries["spam"].TokenTally != 2 {
+		t.Fatalf("expected spam tally 2, got %d", summaries["spam"].TokenTally)
+	}
+	if summaries["ham"].TokenTally != 3 {
+		t.Fatalf("expected ham tally 3, got %d", summaries["ham"].TokenTally)
 	}
 }
 

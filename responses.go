@@ -9,7 +9,7 @@ type CategoryInfo struct {
 
 // getCategoryList returns a summary view of all categories.
 func getCategoryList(c *ClassifierAPI) map[string]*CategoryInfo {
-	categories := c.classifier.Categories.Summaries()
+	categories := c.classifier.Summaries()
 	list := make(map[string]*CategoryInfo)
 	for name, cat := range categories {
 		catInfo := &CategoryInfo{

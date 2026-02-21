@@ -13,7 +13,6 @@ import (
 	"os/signal"
 	"regexp"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -48,7 +47,7 @@ var (
 		mux := http.NewServeMux()
 
 		controller := new(ClassifierAPI)
-		controller.classifier = *bayes.NewClassifier()
+		controller.classifier = bayes.NewClassifier()
 		controller.ready.Store(true)
 		controller.RegisterRoutes(mux)
 
@@ -84,8 +83,7 @@ var (
 
 // ClassifierAPI serves classifier HTTP endpoints and shared classifier state.
 type ClassifierAPI struct {
-	classifier bayes.Classifier
-	mu         sync.RWMutex
+	classifier *bayes.Classifier
 	ready      atomic.Bool
 }
 
@@ -190,11 +188,7 @@ func (c *ClassifierAPI) InfoHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	c.mu.RLock()
-	response := NewInfoClassifierResponse(c)
-	c.mu.RUnlock()
-
-	writeJSON(w, http.StatusOK, response)
+	writeJSON(w, http.StatusOK, NewInfoClassifierResponse(c))
 }
 
 // TrainHandler trains a category using request body text.
@@ -214,12 +208,8 @@ func (c *ClassifierAPI) TrainHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	c.mu.Lock()
 	c.classifier.Train(category, body)
-	response := NewTrainingClassifierResponse(c, true)
-	c.mu.Unlock()
-
-	writeJSON(w, http.StatusOK, response)
+	writeJSON(w, http.StatusOK, NewTrainingClassifierResponse(c, true))
 }
 
 // UntrainHandler untrains a category using request body text.
@@ -239,12 +229,8 @@ func (c *ClassifierAPI) UntrainHandler(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	c.mu.Lock()
 	c.classifier.Untrain(category, body)
-	response := NewTrainingClassifierResponse(c, true)
-	c.mu.Unlock()
-
-	writeJSON(w, http.StatusOK, response)
+	writeJSON(w, http.StatusOK, NewTrainingClassifierResponse(c, true))
 }
 
 // ClassifyHandler classifies request body text and returns the top match.
@@ -258,11 +244,7 @@ func (c *ClassifierAPI) ClassifyHandler(w http.ResponseWriter, req *http.Request
 		return
 	}
 
-	c.mu.RLock()
-	result := c.classifier.Classify(body)
-	c.mu.RUnlock()
-
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusOK, c.classifier.Classify(body))
 }
 
 // ScoreHandler returns per-category scores for request body text.
@@ -276,11 +258,7 @@ func (c *ClassifierAPI) ScoreHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	c.mu.RLock()
-	result := c.classifier.Score(body)
-	c.mu.RUnlock()
-
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusOK, c.classifier.Score(body))
 }
 
 // FlushHandler deletes all training data and gives us a fresh slate.
@@ -289,12 +267,8 @@ func (c *ClassifierAPI) FlushHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	c.mu.Lock()
 	c.classifier.Flush()
-	response := NewTrainingClassifierResponse(c, true)
-	c.mu.Unlock()
-
-	writeJSON(w, http.StatusOK, response)
+	writeJSON(w, http.StatusOK, NewTrainingClassifierResponse(c, true))
 }
 
 // HealthHandler returns liveness status for process health checks.
