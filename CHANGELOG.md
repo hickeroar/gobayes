@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## v3.1.0
+
+### Changed
+- Persistence format for library save/load APIs migrated from gob to JSON.
+- Default persistence file path changed from `/tmp/gobayes.gob` to `/tmp/gobayes-model.json`.
+- Persistence tests updated to validate JSON encode/decode behavior and JSON-based path fixtures.
+- README persistence examples and notes updated to reference JSON persistence paths/files.
+
+### Notes
+- `Load` now expects JSON model payloads; legacy gob model files are no longer supported.
+- Persisted model content remains category/token tallies with model version metadata; runtime probabilities are recomputed after load.
+
 ## v3.0.0
 
 ### Breaking

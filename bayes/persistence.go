@@ -1,7 +1,7 @@
 package bayes
 
 import (
-	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +12,7 @@ import (
 )
 
 const persistedModelVersion = 1
-const defaultModelFilePath = "/tmp/gobayes.gob"
+const defaultModelFilePath = "/tmp/gobayes-model.json"
 
 type tempFile interface {
 	io.Writer
@@ -35,11 +35,11 @@ var (
 )
 
 type modelState struct {
-	Version    int
-	Categories map[string]category.PersistedCategory
+	Version    int                                    `json:"version"`
+	Categories map[string]category.PersistedCategory `json:"categories"`
 }
 
-// Save writes classifier model data to a writer using gob encoding.
+// Save writes classifier model data to a writer using JSON encoding.
 func (c *Classifier) Save(w io.Writer) error {
 	if w == nil {
 		return errNilWriter
@@ -52,21 +52,21 @@ func (c *Classifier) Save(w io.Writer) error {
 	}
 	c.mu.RUnlock()
 
-	if err := gob.NewEncoder(w).Encode(state); err != nil {
+	if err := json.NewEncoder(w).Encode(state); err != nil {
 		return fmt.Errorf("encode model: %w", err)
 	}
 
 	return nil
 }
 
-// Load reads classifier model data from a gob-encoded reader and replaces state.
+// Load reads classifier model data from a JSON reader and replaces state.
 func (c *Classifier) Load(r io.Reader) error {
 	if r == nil {
 		return errNilReader
 	}
 
 	var state modelState
-	if err := gob.NewDecoder(r).Decode(&state); err != nil {
+	if err := json.NewDecoder(r).Decode(&state); err != nil {
 		return fmt.Errorf("decode model: %w", err)
 	}
 
@@ -119,7 +119,7 @@ func (c *Classifier) SaveToFile(path string) error {
 	return nil
 }
 
-// LoadFromFile reads classifier model data from a gob-encoded file.
+// LoadFromFile reads classifier model data from a JSON file.
 func (c *Classifier) LoadFromFile(path string) error {
 	path = resolveModelPath(path)
 	if !filepath.IsAbs(path) {
