@@ -111,16 +111,16 @@ func main() {
 		log.Fatalf("untrain spam failed: %v", err)
 	}
 
-	// Persist trained model state to a gob file.
-	// Passing an empty path uses the default: /tmp/gobayes.gob.
-	if err := classifier.SaveToFile("/tmp/model.gob"); err != nil {
+	// Persist trained model state to a JSON file.
+	// Passing an empty path uses the default: /tmp/gobayes-model.json.
+	if err := classifier.SaveToFile("/tmp/model.json"); err != nil {
 		log.Fatalf("save failed: %v", err)
 	}
 
 	// Load persisted state into a fresh classifier instance.
-	// Passing an empty path uses the default: /tmp/gobayes.gob.
+	// Passing an empty path uses the default: /tmp/gobayes-model.json.
 	loaded := bayes.NewClassifier()
-	if err := loaded.LoadFromFile("/tmp/model.gob"); err != nil {
+	if err := loaded.LoadFromFile("/tmp/model.json"); err != nil {
 		log.Fatalf("load failed: %v", err)
 	}
 
@@ -142,7 +142,7 @@ For non-file workflows, you can use stream APIs:
 - `Load(io.Reader) error`
 
 File helper note:
-- `SaveToFile` and `LoadFromFile` use `/tmp/gobayes.gob` when path is empty.
+- `SaveToFile` and `LoadFromFile` use `/tmp/gobayes-model.json` when path is empty.
 - When a path is provided, it must be absolute.
 
 ## Development Checks

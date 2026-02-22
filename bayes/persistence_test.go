@@ -2,7 +2,7 @@ package bayes
 
 import (
 	"bytes"
-	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -154,7 +154,7 @@ func TestLoadRejectsInvalidPersistedState(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			if err := gob.NewEncoder(&buf).Encode(tc.state); err != nil {
+			if err := json.NewEncoder(&buf).Encode(tc.state); err != nil {
 				t.Fatalf("failed to encode test state: %v", err)
 			}
 
@@ -192,7 +192,7 @@ func TestSaveToFileAndLoadFromFile(t *testing.T) {
 		t.Fatalf("unexpected train error: %v", err)
 	}
 
-	modelPath := filepath.Join(t.TempDir(), "model.gob")
+	modelPath := filepath.Join(t.TempDir(), "model.json")
 	if err := classifier.SaveToFile(modelPath); err != nil {
 		t.Fatalf("save to file failed: %v", err)
 	}
@@ -218,11 +218,11 @@ func TestSaveLoadRejectRelativePaths(t *testing.T) {
 		t.Fatalf("unexpected train error: %v", err)
 	}
 
-	if err := classifier.SaveToFile("model.gob"); err == nil {
+	if err := classifier.SaveToFile("model.json"); err == nil {
 		t.Fatal("expected SaveToFile to reject relative path")
 	}
 
-	if err := classifier.LoadFromFile("model.gob"); err == nil {
+	if err := classifier.LoadFromFile("model.json"); err == nil {
 		t.Fatal("expected LoadFromFile to reject relative path")
 	}
 }
@@ -234,7 +234,7 @@ func TestSaveLoadDefaultPath(t *testing.T) {
 		t.Fatalf("unexpected train error: %v", err)
 	}
 
-	defaultPath := "/tmp/gobayes.gob"
+	defaultPath := "/tmp/gobayes-model.json"
 	_ = os.Remove(defaultPath)
 	defer os.Remove(defaultPath)
 
@@ -262,8 +262,11 @@ func TestSaveAndLoadNilAndDecodeErrors(t *testing.T) {
 	if err := classifier.Load(nil); err == nil {
 		t.Fatal("expected error for nil reader")
 	}
-	if err := classifier.Load(strings.NewReader("not-gob")); err == nil {
-		t.Fatal("expected decode error for invalid gob payload")
+	if err := classifier.Load(strings.NewReader("not-json")); err == nil {
+		t.Fatal("expected decode error for invalid JSON payload")
+	}
+	if err := classifier.Load(strings.NewReader("[]")); err == nil {
+		t.Fatal("expected load to fail for JSON payload with invalid root shape")
 	}
 }
 
@@ -292,11 +295,11 @@ func TestSaveToFileErrors(t *testing.T) {
 		t.Fatalf("unexpected train error: %v", err)
 	}
 
-	if err := classifier.SaveToFile("relative.gob"); err == nil {
+	if err := classifier.SaveToFile("relative.json"); err == nil {
 		t.Fatal("expected relative path error")
 	}
 
-	badPath := filepath.Join(t.TempDir(), "no-such-dir", "model.gob")
+	badPath := filepath.Join(t.TempDir(), "no-such-dir", "model.json")
 	if err := classifier.SaveToFile(badPath); err == nil {
 		t.Fatal("expected create temp file error for missing dir")
 	}
@@ -317,10 +320,10 @@ func (failReadCloser) Close() error {
 // TestLoadFromFileAndLoadReaderErrors verifies load from file and load reader errors.
 func TestLoadFromFileAndLoadReaderErrors(t *testing.T) {
 	classifier := NewClassifier()
-	if err := classifier.LoadFromFile("relative.gob"); err == nil {
+	if err := classifier.LoadFromFile("relative.json"); err == nil {
 		t.Fatal("expected relative path error")
 	}
-	if err := classifier.LoadFromFile("/tmp/does-not-exist-gobayes.gob"); err == nil {
+	if err := classifier.LoadFromFile("/tmp/does-not-exist-gobayes-model.json"); err == nil {
 		t.Fatal("expected open model file error")
 	}
 	if err := classifier.Load(io.Reader(failReadCloser{})); err == nil {
@@ -378,31 +381,31 @@ func TestSaveToFileSyncCloseAndRenameErrors(t *testing.T) {
 	renameFile = func(string, string) error { return nil }
 
 	createTemp = func(string, string) (tempFile, error) {
-		return &fakeTempFile{name: "/tmp/fake-write.gob", writeErr: errors.New("write failed")}, nil
+		return &fakeTempFile{name: "/tmp/fake-write.json", writeErr: errors.New("write failed")}, nil
 	}
-	if err := classifier.SaveToFile("/tmp/model.gob"); err == nil {
+	if err := classifier.SaveToFile("/tmp/model.json"); err == nil {
 		t.Fatal("expected save/write error from SaveToFile")
 	}
 
 	createTemp = func(string, string) (tempFile, error) {
-		return &fakeTempFile{name: "/tmp/fake-sync.gob", syncErr: errors.New("sync failed")}, nil
+		return &fakeTempFile{name: "/tmp/fake-sync.json", syncErr: errors.New("sync failed")}, nil
 	}
-	if err := classifier.SaveToFile("/tmp/model.gob"); err == nil {
+	if err := classifier.SaveToFile("/tmp/model.json"); err == nil {
 		t.Fatal("expected sync error from SaveToFile")
 	}
 
 	createTemp = func(string, string) (tempFile, error) {
-		return &fakeTempFile{name: "/tmp/fake-close.gob", closeErr: errors.New("close failed")}, nil
+		return &fakeTempFile{name: "/tmp/fake-close.json", closeErr: errors.New("close failed")}, nil
 	}
-	if err := classifier.SaveToFile("/tmp/model.gob"); err == nil {
+	if err := classifier.SaveToFile("/tmp/model.json"); err == nil {
 		t.Fatal("expected close error from SaveToFile")
 	}
 
 	createTemp = func(string, string) (tempFile, error) {
-		return &fakeTempFile{name: "/tmp/fake-rename.gob"}, nil
+		return &fakeTempFile{name: "/tmp/fake-rename.json"}, nil
 	}
 	renameFile = func(string, string) error { return errors.New("rename failed") }
-	if err := classifier.SaveToFile("/tmp/model.gob"); err == nil {
+	if err := classifier.SaveToFile("/tmp/model.json"); err == nil {
 		t.Fatal("expected rename error from SaveToFile")
 	}
 }
