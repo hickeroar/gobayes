@@ -129,11 +129,18 @@ func main() {
 }
 ```
 
+Multi-language with optional stop-word removal (config persisted on Save):
+```go
+classifier := bayes.NewClassifierWithOptions("spanish", true)
+// ... train, save, load — tokenizer settings are restored automatically
+```
+
 Notes for library usage:
 - `Classifier` methods are goroutine-safe.
 - Gobayes is memory-based with optional persistence when used as a library (`Save`/`Load`, `SaveToFile`/`LoadFromFile`).
-- Persisted model data includes category/token tallies only; tokenizer configuration is runtime behavior and is not persisted.
-- Default tokenization applies Unicode normalization, punctuation splitting, and English stemming before scoring.
+- Persisted model data includes category/token tallies. When using `NewClassifierWithOptions`, tokenizer config (language, stop-word removal) is also persisted and restored on load.
+- Default tokenization: NFKC normalization, locale-aware lowercasing, split on non-alphanumeric, stemming (Snowball), and optional stop-word filtering. Supported languages: english, spanish, french, russian, swedish, norwegian, hungarian.
+- Use `NewClassifierWithOptions(lang, removeStopWords)` for multi-language and optional stop-word removal; tokenizer config is persisted. Use `NewClassifierWithTokenizer(fn)` for custom tokenizers (config not persisted).
 - Scores are relative values and should be compared within the same model, not treated as calibrated probabilities.
 - Category names accepted by `Train`/`Untrain` match `^[-_A-Za-z0-9]+$`; invalid names return an error.
 

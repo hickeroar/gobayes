@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hickeroar/gobayes/v3/bayes/category"
 )
@@ -34,9 +35,15 @@ var (
 	removeFile              = os.Remove
 )
 
+type persistedTokenizer struct {
+	Language        string `json:"language"`
+	RemoveStopWords bool   `json:"removeStopWords"`
+}
+
 type modelState struct {
 	Version    int                                    `json:"version"`
 	Categories map[string]category.PersistedCategory `json:"categories"`
+	Tokenizer  *persistedTokenizer                   `json:"tokenizer,omitempty"`
 }
 
 // Save writes classifier model data to a writer using JSON encoding.
@@ -49,6 +56,12 @@ func (c *Classifier) Save(w io.Writer) error {
 	state := modelState{
 		Version:    persistedModelVersion,
 		Categories: c.categories.ExportStates(),
+	}
+	if c.tokenizerLang != "" {
+		state.Tokenizer = &persistedTokenizer{
+			Language:        c.tokenizerLang,
+			RemoveStopWords: c.tokenizerRemoveStopWords,
+		}
 	}
 	c.mu.RUnlock()
 
@@ -66,7 +79,9 @@ func (c *Classifier) Load(r io.Reader) error {
 	}
 
 	var state modelState
-	if err := json.NewDecoder(r).Decode(&state); err != nil {
+	dec := json.NewDecoder(r)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&state); err != nil {
 		return fmt.Errorf("decode model: %w", err)
 	}
 
@@ -80,6 +95,15 @@ func (c *Classifier) Load(r io.Reader) error {
 
 	c.mu.Lock()
 	c.categories = *cats
+	if state.Tokenizer != nil {
+		lang := strings.ToLower(strings.TrimSpace(state.Tokenizer.Language))
+		if lang == "" {
+			lang = "english"
+		}
+		c.Tokenizer = NewDefaultTokenizer(lang, state.Tokenizer.RemoveStopWords)
+		c.tokenizerLang = lang
+		c.tokenizerRemoveStopWords = state.Tokenizer.RemoveStopWords
+	}
 	c.mu.Unlock()
 
 	return nil
