@@ -29,3 +29,5 @@ gobayes
 coverage.out
 coverage_cat.out
 coverage.html
+
+.DS_Store
