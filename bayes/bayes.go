@@ -6,11 +6,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"unicode"
 
 	"github.com/hickeroar/gobayes/v3/bayes/category"
-	"github.com/kljensen/snowball"
-	"golang.org/x/text/unicode/norm"
 )
 
 // Classification is the result of classifying a text sample.
@@ -21,9 +18,11 @@ type Classification struct {
 
 // Classifier trains text categories and classifies new text samples.
 type Classifier struct {
-	categories category.Categories
-	Tokenizer  func(string) []string
-	mu         sync.RWMutex
+	categories             category.Categories
+	Tokenizer              func(string) []string
+	tokenizerLang          string // persisted when set via NewClassifierWithOptions
+	tokenizerRemoveStopWords bool  // persisted when set via NewClassifierWithOptions
+	mu                     sync.RWMutex
 }
 
 var categoryNamePattern = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
@@ -31,31 +30,46 @@ var categoryNamePattern = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
 // ErrInvalidCategoryName indicates category input did not match the allowed pattern.
 var ErrInvalidCategoryName = errors.New("invalid category name")
 
-// NewClassifier returns a new Classifier instance.
+// defaultTokenizer is the tokenizer used when Classifier.Tokenizer is nil.
+var defaultTokenizer = NewDefaultTokenizer("english", false)
+
+// NewClassifier returns a new Classifier instance with the default tokenizer
+// (English, no stop-word removal). Set Classifier.Tokenizer to customize, e.g.
+// NewDefaultTokenizer("spanish", true) for Spanish with stop words removed.
 func NewClassifier() *Classifier {
 	return &Classifier{
 		categories: *category.NewCategories(),
 	}
 }
 
-// tokenizeText normalizes, tokenizes, and stems input text.
-func (c *Classifier) tokenizeText(sample string) []string {
-	sample = norm.NFKC.String(sample)
-	sample = strings.ToLower(sample)
-	rawTokens := strings.FieldsFunc(sample, func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-	})
-
-	tokens := make([]string, 0, len(rawTokens))
-	for _, token := range rawTokens {
-		stemmed, err := snowball.Stem(token, "english", true)
-		if err == nil && stemmed != "" {
-			token = stemmed
-		}
-		tokens = append(tokens, token)
+// NewClassifierWithTokenizer returns a Classifier that uses the given tokenizer.
+// Tokenizer config is not persisted when using this constructor.
+func NewClassifierWithTokenizer(tokenizer func(string) []string) *Classifier {
+	return &Classifier{
+		categories: *category.NewCategories(),
+		Tokenizer:  tokenizer,
 	}
+}
 
-	return tokens
+// NewClassifierWithOptions returns a Classifier with the given language and
+// stop-word setting. The tokenizer config is persisted on Save and restored on Load.
+func NewClassifierWithOptions(lang string, removeStopWords bool) *Classifier {
+	lang = strings.ToLower(strings.TrimSpace(lang))
+	if lang == "" {
+		lang = "english"
+	}
+	return &Classifier{
+		categories:               *category.NewCategories(),
+		Tokenizer:                NewDefaultTokenizer(lang, removeStopWords),
+		tokenizerLang:            lang,
+		tokenizerRemoveStopWords: removeStopWords,
+	}
+}
+
+// tokenizeText returns tokens using the default tokenizer. When snowball.Stem
+// fails or returns empty, the original token is kept.
+func (c *Classifier) tokenizeText(sample string) []string {
+	return defaultTokenizer(sample)
 }
 
 // getTokenizer returns the configured tokenizer or the default tokenizer.

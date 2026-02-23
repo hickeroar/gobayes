@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here.
 
+## v3.2.0
+
+### Added
+- Multi-language tokenization for seven languages (english, spanish, french, russian, swedish, norwegian, hungarian) via kljensen/snowball.
+- Optional stop-word filtering via self-contained `bayes/stopwords` package; opt-in, default off (aligned with simplebayes).
+- `NewDefaultTokenizer(lang, removeStopWords)` factory for configurable tokenization.
+- `NewClassifierWithOptions(lang, removeStopWords)` constructor; tokenizer config is persisted on Save and restored on Load.
+- `NewClassifierWithTokenizer(tokenizer)` for custom tokenizers (config not persisted).
+- Locale-aware lowercasing via `golang.org/x/text/cases` for correct case folding per language.
+- Tokenizer metadata persisted in model JSON: `"tokenizer": {"language": "english", "removeStopWords": false}`.
+
+### Changed
+- JSON Load now uses `DisallowUnknownFields()` for stricter validation and resilience to malformed payloads.
+- Default tokenizer uses locale-aware lowercasing instead of `strings.ToLower`.
+- Persisted model format extended with optional `tokenizer` object; backward compatible with v3.1.0 saves (no tokenizer field).
+- README updated for multi-language tokenization, stop words, and persisted tokenizer config.
+- `coverage.html` added to `.gitignore`.
+
+### Notes
+- When snowball.Stem fails or returns empty, the original token is kept. Documented in package and tokenizer docs.
+- Unsupported language names fall back to English stemming. Empty or whitespace-only language defaults to English.
+
 ## v3.1.0
 
 ### Changed

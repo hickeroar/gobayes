@@ -57,6 +57,82 @@ func TestPersistenceRoundTrip(t *testing.T) {
 	}
 }
 
+// TestPersistenceRoundTripWithTokenizerConfig verifies tokenizer config is persisted and restored.
+func TestPersistenceRoundTripWithTokenizerConfig(t *testing.T) {
+	original := NewClassifierWithOptions("spanish", true)
+	if err := original.Train("spam", "hola mundo"); err != nil {
+		t.Fatalf("unexpected train error: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := original.Save(&buf); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	loaded := NewClassifier()
+	if err := loaded.Load(&buf); err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+
+	if loaded.tokenizerLang != "spanish" {
+		t.Fatalf("expected tokenizerLang spanish after load, got %q", loaded.tokenizerLang)
+	}
+	if !loaded.tokenizerRemoveStopWords {
+		t.Fatal("expected tokenizerRemoveStopWords true after load")
+	}
+
+	result := loaded.Classify("hola")
+	if result.Category != "spam" {
+		t.Fatalf("expected spanish tokenizer to classify hola as spam, got %q", result.Category)
+	}
+}
+
+// TestLoadWithTokenizerConfigNormalizesLanguage verifies loaded tokenizer language is normalized.
+func TestLoadWithTokenizerConfigNormalizesLanguage(t *testing.T) {
+	state := modelState{
+		Version: persistedModelVersion,
+		Categories: map[string]category.PersistedCategory{
+			"spam": {Tokens: map[string]int{"buy": 1}, Tally: 1},
+		},
+		Tokenizer: &persistedTokenizer{Language: "  SPANISH  ", RemoveStopWords: false},
+	}
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(state); err != nil {
+		t.Fatalf("encode failed: %v", err)
+	}
+
+	c := NewClassifier()
+	if err := c.Load(&buf); err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+	if c.tokenizerLang != "spanish" {
+		t.Fatalf("expected normalized lang spanish, got %q", c.tokenizerLang)
+	}
+}
+
+// TestLoadWithTokenizerEmptyLanguageDefaultsToEnglish verifies empty tokenizer language defaults to english.
+func TestLoadWithTokenizerEmptyLanguageDefaultsToEnglish(t *testing.T) {
+	state := modelState{
+		Version: persistedModelVersion,
+		Categories: map[string]category.PersistedCategory{
+			"spam": {Tokens: map[string]int{"buy": 1}, Tally: 1},
+		},
+		Tokenizer: &persistedTokenizer{Language: "", RemoveStopWords: false},
+	}
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(state); err != nil {
+		t.Fatalf("encode failed: %v", err)
+	}
+
+	c := NewClassifier()
+	if err := c.Load(&buf); err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+	if c.tokenizerLang != "english" {
+		t.Fatalf("expected default lang english for empty, got %q", c.tokenizerLang)
+	}
+}
+
 // TestLoadReplacesExistingState verifies load replaces existing state.
 func TestLoadReplacesExistingState(t *testing.T) {
 	source := NewClassifier()

@@ -205,6 +205,97 @@ func TestCalculateBayesianProbabilityDenominatorZero(t *testing.T) {
 	}
 }
 
+// TestNewClassifierWithTokenizer verifies custom tokenizer constructor.
+func TestNewClassifierWithTokenizer(t *testing.T) {
+	tok := func(s string) []string { return []string{"x", "y"} }
+	c := NewClassifierWithTokenizer(tok)
+	if c.Tokenizer == nil {
+		t.Fatal("expected non-nil tokenizer")
+	}
+	if err := c.Train("a", "ignore"); err != nil {
+		t.Fatalf("train failed: %v", err)
+	}
+	cat, _ := c.categories.LookupCategory("a")
+	if cat.GetTokenCount("x") != 1 || cat.GetTokenCount("y") != 1 {
+		t.Fatalf("expected custom tokenizer output, got counts x=%d y=%d", cat.GetTokenCount("x"), cat.GetTokenCount("y"))
+	}
+}
+
+// TestNewClassifierWithOptions verifies options constructor and tokenizer config.
+func TestNewClassifierWithOptions(t *testing.T) {
+	c := NewClassifierWithOptions("spanish", true)
+	if c.tokenizerLang != "spanish" {
+		t.Fatalf("expected tokenizerLang spanish, got %q", c.tokenizerLang)
+	}
+	if !c.tokenizerRemoveStopWords {
+		t.Fatal("expected tokenizerRemoveStopWords true")
+	}
+	if err := c.Train("spam", "el gato"); err != nil {
+		t.Fatalf("train failed: %v", err)
+	}
+	cat, _ := c.categories.LookupCategory("spam")
+	if cat.GetTokenCount("gat") == 0 && cat.GetTokenCount("gato") == 0 {
+		t.Fatalf("expected spanish stemming to produce token")
+	}
+}
+
+// TestNewClassifierWithOptionsNormalizesLang verifies language normalization.
+func TestNewClassifierWithOptionsNormalizesLang(t *testing.T) {
+	c := NewClassifierWithOptions("  SPANISH  ", false)
+	if c.tokenizerLang != "spanish" {
+		t.Fatalf("expected normalized lang spanish, got %q", c.tokenizerLang)
+	}
+	c2 := NewClassifierWithOptions("", false)
+	if c2.tokenizerLang != "english" {
+		t.Fatalf("expected default lang english for empty, got %q", c2.tokenizerLang)
+	}
+}
+
+// TestDefaultTokenizerWithStopWords verifies stop-word filtering when enabled.
+func TestDefaultTokenizerWithStopWords(t *testing.T) {
+	tok := NewDefaultTokenizer("english", true)
+	tokens := tok("the quick brown fox")
+	for _, tkn := range tokens {
+		if tkn == "the" {
+			t.Fatal("expected 'the' to be filtered as stop word")
+		}
+	}
+}
+
+// TestDefaultTokenizerEmptyLangDefaultsToEnglish verifies empty or whitespace-only language defaults to english.
+func TestDefaultTokenizerEmptyLangDefaultsToEnglish(t *testing.T) {
+	for _, input := range []string{"", "   ", "\t"} {
+		tok := NewDefaultTokenizer(input, false)
+		tokens := tok("test word")
+		if len(tokens) < 2 {
+			t.Fatalf("expected tokens for lang %q, got %v", input, tokens)
+		}
+	}
+}
+
+// TestDefaultTokenizerUnsupportedLangDefaultsToEnglish verifies unsupported language falls back to english.
+func TestDefaultTokenizerUnsupportedLangDefaultsToEnglish(t *testing.T) {
+	for _, lang := range []string{"klingon", "xyz", "nosuchlang"} {
+		tok := NewDefaultTokenizer(lang, false)
+		tokens := tok("Running runs")
+		if len(tokens) < 2 {
+			t.Fatalf("expected stemming with english fallback for %q, got %v", lang, tokens)
+		}
+	}
+}
+
+// TestDefaultTokenizerAllLanguages exercises all seven supported languages.
+func TestDefaultTokenizerAllLanguages(t *testing.T) {
+	langs := []string{"english", "spanish", "french", "russian", "swedish", "norwegian", "hungarian"}
+	for _, lang := range langs {
+		tok := NewDefaultTokenizer(lang, false)
+		tokens := tok("test word")
+		if len(tokens) == 0 {
+			t.Fatalf("expected tokens for %s, got none", lang)
+		}
+	}
+}
+
 // TestDefaultTokenizerNormalizesPunctuationAndStems verifies default tokenizer normalizes punctuation and stems.
 func TestDefaultTokenizerNormalizesPunctuationAndStems(t *testing.T) {
 	classifier := NewClassifier()
