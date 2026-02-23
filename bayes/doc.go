@@ -1,4 +1,4 @@
-// Package bayes provides a Naive Bayes text classifier with JSON persistence
+// Package bayes provides a Naive Bayesian text classifier with JSON persistence
 // and configurable tokenization.
 //
 // Tokenization: The default tokenizer (see NewDefaultTokenizer) normalizes

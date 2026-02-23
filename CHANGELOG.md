@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## v3.2.1
+
+### Changed
+- Documentation: package doc and changelog now use "Naive Bayesian" instead of "Naive Bayes" for terminology consistency.
+
 ## v3.2.0
 
 ### Added
@@ -126,7 +131,7 @@ After:
 ## v1.0.0 (all changes before today)
 
 ### Added
-- Initial Naive Bayes classifier implementation and category structures.
+- Initial Naive Bayesian classifier implementation and category structures.
 - Early HTTP API endpoints and request handlers for training and classification.
 - Support for category scoring, untraining, and flush operations.
 
