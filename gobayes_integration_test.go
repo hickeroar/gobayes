@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -27,7 +28,8 @@ type integrationServer struct {
 }
 
 // startIntegrationServer builds and starts a test server process.
-func startIntegrationServer(t *testing.T, authToken string) *integrationServer {
+// env is optional env vars (e.g. "GOBAYES_PORT=9000"); extraArgs are appended to the CLI (e.g. "--verbose").
+func startIntegrationServer(t *testing.T, authToken string, env []string, extraArgs []string) *integrationServer {
 	t.Helper()
 
 	port := reservePort(t)
@@ -45,8 +47,10 @@ func startIntegrationServer(t *testing.T, authToken string) *integrationServer {
 	if authToken != "" {
 		args = append(args, "--auth-token", authToken)
 	}
+	args = append(args, extraArgs...)
 
 	cmd := exec.Command(binPath, args...)
+	cmd.Env = append(os.Environ(), env...)
 	var output bytes.Buffer
 	cmd.Stdout = &output
 	cmd.Stderr = &output
@@ -174,7 +178,7 @@ func decodeJSON[T any](t *testing.T, resp *http.Response) T {
 
 // TestIntegrationLifecycleFlow verifies integration lifecycle flow.
 func TestIntegrationLifecycleFlow(t *testing.T) {
-	server := startIntegrationServer(t, "")
+	server := startIntegrationServer(t, "", nil, nil)
 
 	type trainResp struct {
 		Success bool
@@ -248,7 +252,7 @@ func TestIntegrationLifecycleFlow(t *testing.T) {
 
 // TestIntegrationAuthAndProbes verifies integration auth and probes.
 func TestIntegrationAuthAndProbes(t *testing.T) {
-	server := startIntegrationServer(t, "secret-token")
+	server := startIntegrationServer(t, "secret-token", nil, nil)
 
 	type errorResp struct {
 		Error string
@@ -287,7 +291,7 @@ func TestIntegrationAuthAndProbes(t *testing.T) {
 
 // TestIntegrationErrorContracts verifies integration error contracts.
 func TestIntegrationErrorContracts(t *testing.T) {
-	server := startIntegrationServer(t, "")
+	server := startIntegrationServer(t, "", nil, nil)
 
 	type errorResp struct {
 		Error string
@@ -312,5 +316,37 @@ func TestIntegrationErrorContracts(t *testing.T) {
 	badMethod := decodeJSON[errorResp](t, resp)
 	if badMethod.Error == "" {
 		t.Fatal("expected non-empty error for method not allowed")
+	}
+}
+
+// TestIntegrationEnvDefaults verifies that env vars supply defaults when flags are not set.
+func TestIntegrationEnvDefaults(t *testing.T) {
+	// Server gets auth token from env only (no --auth-token flag).
+	server := startIntegrationServer(t, "", []string{"GOBAYES_AUTH_TOKEN=env-token"}, nil)
+
+	resp := sendRequest(t, server, http.MethodGet, "/info", "", "")
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("without token: got %d want 401", resp.StatusCode)
+	}
+
+	resp = sendRequest(t, server, http.MethodGet, "/info", "", "env-token")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("with env token: got %d want 200", resp.StatusCode)
+	}
+}
+
+// TestIntegrationFlagOverridesEnv verifies that CLI flags override env vars.
+func TestIntegrationFlagOverridesEnv(t *testing.T) {
+	// Env says one token, flag says another; flag should win.
+	server := startIntegrationServer(t, "flag-token", []string{"GOBAYES_AUTH_TOKEN=env-token"}, nil)
+
+	resp := sendRequest(t, server, http.MethodGet, "/info", "", "env-token")
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("env token should be rejected when flag set: got %d", resp.StatusCode)
+	}
+
+	resp = sendRequest(t, server, http.MethodGet, "/info", "", "flag-token")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("flag token should be accepted: got %d", resp.StatusCode)
 	}
 }
