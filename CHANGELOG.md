@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## Unreleased
+## v3.3.0
 
 ### Added
 - CLI flags: `--host`, `--language`, `--remove-stop-words`, `--verbose` (existing `--port` and `--auth-token` unchanged).
