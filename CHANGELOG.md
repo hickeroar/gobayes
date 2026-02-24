@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased
+
+### Added
+- CLI flags: `--host`, `--language`, `--remove-stop-words`, `--verbose` (existing `--port` and `--auth-token` unchanged).
+- Environment variables for defaults: `GOBAYES_HOST`, `GOBAYES_PORT`, `GOBAYES_AUTH_TOKEN`, `GOBAYES_LANGUAGE`, `GOBAYES_REMOVE_STOP_WORDS`, `GOBAYES_VERBOSE`. Boolean env (REMOVE_STOP_WORDS, VERBOSE) accept `1`, `true`, or `yes` (case-insensitive) for enabled.
+- Optional verbose logging: when `--verbose` or `GOBAYES_VERBOSE` is set, request/response and body previews are logged to stderr.
+- Server bind address uses host and port (e.g. `0.0.0.0:8000` or `127.0.0.1:9000`); configurable via `--host` and `--port`.
+- Classifier language and stop-word removal are configurable from CLI/env and applied via `NewClassifierWithOptions`.
+
+### Changed
+- Help/usage output shows double-dash form for all flags (e.g. `--port`). Single-dash forms (e.g. `-port`) remain accepted for backward compatibility.
+- Default precedence: hard-coded default, then env var, then CLI flag (flag wins).
+
+### Notes
+- Backward compatible: existing scripts using `-port` or `-auth-token` continue to work. `/healthz` and `/readyz` remain unauthenticated when auth is enabled.
+
 ## v3.2.1
 
 ### Changed

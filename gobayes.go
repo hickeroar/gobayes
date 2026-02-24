@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -23,6 +25,93 @@ import (
 const maxRequestBodyBytes = 1 << 20 // 1 MiB
 
 var categoryPathPattern = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
+
+// serverConfig holds server and classifier configuration loaded from env and flags.
+type serverConfig struct {
+	Host             string
+	Port             string
+	AuthToken        string
+	Language         string
+	RemoveStopWords  bool
+	Verbose          bool
+}
+
+// envOrDefault returns getenv(key) trimmed; if empty, returns def. Used for string env vars.
+func envOrDefault(getenv func(string) string, key, def string) string {
+	s := strings.TrimSpace(getenv(key))
+	if s == "" {
+		return def
+	}
+	return s
+}
+
+// envBool returns true if getenv(key) trimmed and lowercased is "1", "true", or "yes"; else false. Empty uses def.
+func envBool(getenv func(string) string, key string, def bool) bool {
+	val := strings.ToLower(strings.TrimSpace(getenv(key)))
+	if val == "" {
+		return def
+	}
+	switch val {
+	case "1", "true", "yes":
+		return true
+	default:
+		return false
+	}
+}
+
+// setUsageDoubleDash sets fs.Usage so that PrintDefaults shows --flag instead of -flag.
+func setUsageDoubleDash(fs *flag.FlagSet) {
+	fs.Usage = func() {
+		fmt.Fprintf(fs.Output(), "Usage of %s:\n", fs.Name())
+		fs.VisitAll(func(f *flag.Flag) {
+			fmt.Fprintf(fs.Output(), "  --%s\n    \t%s\n", f.Name, f.Usage)
+		})
+	}
+}
+
+// loadServerConfig loads server config from getenv (for defaults) and fs/args (CLI overrides). Parses flags.
+func loadServerConfig(fs *flag.FlagSet, args []string, getenv func(string) string) (*serverConfig, error) {
+	setUsageDoubleDash(fs)
+	hostDefault := envOrDefault(getenv, "GOBAYES_HOST", "0.0.0.0")
+	portDefault := envOrDefault(getenv, "GOBAYES_PORT", "8000")
+	authDefault := envOrDefault(getenv, "GOBAYES_AUTH_TOKEN", "")
+	langDefault := envOrDefault(getenv, "GOBAYES_LANGUAGE", "english")
+	removeStopDefault := envBool(getenv, "GOBAYES_REMOVE_STOP_WORDS", false)
+	verboseDefault := envBool(getenv, "GOBAYES_VERBOSE", false)
+
+	hostFlag := fs.String("host", hostDefault, "Host interface to bind. (default: 0.0.0.0)")
+	portFlag := fs.String("port", portDefault, "Port to bind. (default: 8000)")
+	authFlag := fs.String("auth-token", authDefault, "Optional bearer token for non-probe endpoints.")
+	languageFlag := fs.String("language", langDefault, "Language code for stemmer and stop words. (default: english)")
+	removeStopFlag := fs.Bool("remove-stop-words", removeStopDefault, "Filter common stop words (the, is, and, etc.).")
+	verboseFlag := fs.Bool("verbose", verboseDefault, "Log requests, responses, and classifier operations to stderr.")
+
+	if err := fs.Parse(args); err != nil {
+		return nil, err
+	}
+
+	language := strings.ToLower(strings.TrimSpace(*languageFlag))
+	if language == "" {
+		language = "english"
+	}
+	host := strings.TrimSpace(*hostFlag)
+	if host == "" {
+		host = "0.0.0.0"
+	}
+	port := strings.TrimSpace(*portFlag)
+	if port == "" {
+		port = "8000"
+	}
+
+	return &serverConfig{
+		Host:            host,
+		Port:            port,
+		AuthToken:       strings.TrimSpace(*authFlag),
+		Language:        language,
+		RemoveStopWords: *removeStopFlag,
+		Verbose:         *verboseFlag,
+	}, nil
+}
 
 type httpServer interface {
 	ListenAndServe() error
@@ -44,24 +133,28 @@ var (
 	}
 	logFatal = func(v ...interface{}) { log.Fatal(v...) }
 	runMain  = func() error {
-		mux := http.NewServeMux()
+		cfg, err := loadServerConfig(flag.CommandLine, os.Args[1:], os.Getenv)
+		if err != nil {
+			return err
+		}
 
+		mux := http.NewServeMux()
 		controller := new(ClassifierAPI)
-		controller.classifier = bayes.NewClassifier()
+		controller.classifier = bayes.NewClassifierWithOptions(cfg.Language, cfg.RemoveStopWords)
 		controller.ready.Store(true)
 		controller.RegisterRoutes(mux)
 
-		port := flag.String("port", "8000", "The port the server should listen on.")
-		authToken := flag.String("auth-token", "", "Optional bearer token required for all endpoints except /healthz and /readyz.")
-		flag.Parse()
-
 		var handler http.Handler = mux
-		if *authToken != "" {
-			handler = withAuthorizationToken(handler, *authToken)
+		if cfg.AuthToken != "" {
+			handler = withAuthorizationToken(handler, cfg.AuthToken)
+		}
+		if cfg.Verbose {
+			handler = withVerbose(handler)
 		}
 
-		server := newServer(":"+*port, handler)
-		log.Printf("Server is listening on port %s.", *port)
+		addr := net.JoinHostPort(cfg.Host, cfg.Port)
+		server := newServer(addr, handler)
+		log.Printf("Server is listening on %s.", addr)
 
 		go func() {
 			if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -160,6 +253,60 @@ func requireMethod(w http.ResponseWriter, req *http.Request, method string) bool
 		return false
 	}
 	return true
+}
+
+// withVerbose wraps a handler to log request and response to stderr when verbose is enabled.
+func withVerbose(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		log.Printf("[gobayes] %s %s", req.Method, req.URL.Path)
+		body, _ := io.ReadAll(req.Body)
+		req.Body = io.NopCloser(strings.NewReader(string(body)))
+		if len(body) > 0 {
+			preview := string(body)
+			if len(preview) > 200 {
+				preview = preview[:200] + "..."
+			}
+			log.Printf("[gobayes] request body (%d bytes): %s", len(body), preview)
+		}
+		rec := &responseRecorder{ResponseWriter: w, status: http.StatusOK, body: &bytesBuffer{}}
+		next.ServeHTTP(rec, req)
+		log.Printf("[gobayes] response %d", rec.status)
+		if rec.body.Len() > 0 {
+			preview := rec.body.String()
+			if len(preview) > 200 {
+				preview = preview[:200] + "..."
+			}
+			log.Printf("[gobayes] response body (%d bytes): %s", rec.body.Len(), preview)
+		}
+	})
+}
+
+type responseRecorder struct {
+	http.ResponseWriter
+	status int
+	body   *bytesBuffer
+}
+
+type bytesBuffer struct {
+	b []byte
+}
+
+func (b *bytesBuffer) Write(p []byte) (int, error) {
+	b.b = append(b.b, p...)
+	return len(p), nil
+}
+
+func (b *bytesBuffer) Len() int   { return len(b.b) }
+func (b *bytesBuffer) String() string { return string(b.b) }
+
+func (r *responseRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *responseRecorder) Write(p []byte) (int, error) {
+	r.body.Write(p)
+	return r.ResponseWriter.Write(p)
 }
 
 // withAuthorizationToken wraps a handler with bearer-token authorization checks.

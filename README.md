@@ -41,32 +41,54 @@ $ go get github.com/hickeroar/gobayes/v3
 ## Run as an API Server
 ```
 $ go run .
-Server is listening on port 8000.
+Server is listening on 0.0.0.0:8000.
 ```
+
+CLI options:
 ```
-go run . --help
-Usage of gobayes:
-  -auth-token string
-        Optional bearer token required for all endpoints except /healthz and /readyz.
-  -port string
-        The port the server should listen on. (default "8000")
+--host              Host interface to bind. (default: 0.0.0.0)
+--port              Port to bind. (default: 8000)
+--auth-token        Optional bearer token for non-probe endpoints.
+--language          Language code for stemmer and stop words. (default: english)
+--remove-stop-words Filter common stop words (the, is, and, etc.).
+--verbose           Log requests, responses, and classifier operations to stderr.
+--help              Show all options.
 ```
+
+Environment variable equivalents:
+```
+GOBAYES_HOST
+GOBAYES_PORT
+GOBAYES_AUTH_TOKEN
+GOBAYES_LANGUAGE
+GOBAYES_REMOVE_STOP_WORDS   (1, true, yes = enabled)
+GOBAYES_VERBOSE             (1, true, yes = enabled)
+```
+
+Examples:
 ```
 $ go run . --port 8181
-Server is listening on port 8181.
+Server is listening on 0.0.0.0:8181.
 ```
 ```
 $ go run . --port 8181 --auth-token my-secret-token
-Server is listening on port 8181.
+Server is listening on 0.0.0.0:8181.
+```
+```
+$ go run . --host 127.0.0.1 --port 9000 --language spanish --verbose
+Server is listening on 127.0.0.1:9000.
 ```
 
-When `--auth-token` is set, all API endpoints except `/healthz` and `/readyz` require:
+When `--auth-token` is set (or `GOBAYES_AUTH_TOKEN`), all API endpoints except `/healthz` and `/readyz` require:
 
 ```
 Authorization: Bearer <token>
 ```
 
-Note: both single-hyphen and double-hyphen forms are accepted for flags, but examples use double-hyphen for consistency with common CLI conventions.
+Environment variables set the default for each option; explicit flags override env. Both single-hyphen and double-hyphen flag forms are accepted (e.g. `-port` and `--port`); examples use double-hyphen.
+
+### Verbose mode
+When `--verbose` is set (or `GOBAYES_VERBOSE=1`), the server logs each request and response to stderr: method, path, body length and a short preview, and response status and body preview. Useful for debugging; leave off in production.
 
 ## Use as a Library in Your App
 
